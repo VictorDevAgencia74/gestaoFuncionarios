@@ -107,6 +107,60 @@ ErrHandler:
     MsgBox msg, vbExclamation, APP_TITLE
 End Sub
 
+Public Sub Employee_DeleteFromForm()
+    On Error GoTo ErrHandler
+    Dim ws As Worksheet
+    Set ws = GetWs(SH_CADASTRO)
+    Dim empId As String
+    empId = Trim$(CStr(ws.Range("B3").Value))
+    If empId = "(automatico)" Or Len(empId) = 0 Then Err.Raise vbObjectError + 120, APP_TITLE, "Informe o FuncionarioID para excluir."
+
+    If Employee_HasAllocations(empId) Then
+        Err.Raise vbObjectError + 121, APP_TITLE, "Nao e possivel excluir: funcionario possui alocacoes. Use Status=Inativo."
+    End If
+
+    If MsgBox("Excluir funcionario " & empId & "?", vbQuestion + vbYesNo, APP_TITLE) <> vbYes Then Exit Sub
+
+    Dim wsDb As Worksheet
+    Set wsDb = GetWs(SH_FUNC_DB)
+    Dim lo As ListObject
+    Set lo = wsDb.ListObjects(TB_FUNC)
+    Dim rowIdx As Long
+    rowIdx = Employee_FindRowById(lo, empId)
+    If rowIdx = 0 Then Err.Raise vbObjectError + 122, APP_TITLE, "Funcionario nao encontrado."
+
+    Dim pwd As String
+    pwd = CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
+    wsDb.Unprotect Password:=pwd
+    lo.ListRows(rowIdx).Delete
+    wsDb.Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
+
+    Employee_ClearForm
+    Setup_RefreshAfterDataChange
+    MsgBox "Funcionario excluido: " & empId, vbInformation, APP_TITLE
+    Exit Sub
+
+ErrHandler:
+    MsgBox Err.Description, vbExclamation, APP_TITLE
+End Sub
+
+Private Function Employee_HasAllocations(ByVal empId As String) As Boolean
+    Employee_HasAllocations = False
+    Dim lo As ListObject
+    Set lo = GetWs(SH_ALOC_DB).ListObjects(TB_ALOC)
+    If lo.DataBodyRange Is Nothing Then Exit Function
+
+    Dim idxEmp As Long
+    idxEmp = TableColIndex(lo, "FuncionarioID")
+    Dim r As Long
+    For r = 1 To lo.DataBodyRange.Rows.Count
+        If StrComp(CStr(lo.DataBodyRange.Cells(r, idxEmp).Value), empId, vbTextCompare) = 0 Then
+            Employee_HasAllocations = True
+            Exit Function
+        End If
+    Next r
+End Function
+
 Private Function Employee_FindRowById(ByVal lo As ListObject, ByVal empId As String) As Long
     If lo.DataBodyRange Is Nothing Then Exit Function
     If Len(Trim$(empId)) = 0 Then Exit Function

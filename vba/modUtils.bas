@@ -90,6 +90,29 @@ Public Sub RemoveShapesByOnAction(ByVal ws As Worksheet, ParamArray macroNames()
             Next i
         End If
     Next shp
+
+    Dim btn As Object
+    On Error Resume Next
+    For Each btn In ws.Buttons
+        For i = LBound(macroNames) To UBound(macroNames)
+            If StrComp(CStr(btn.OnAction), CStr(macroNames(i)), vbTextCompare) = 0 Then
+                btn.Delete
+                Exit For
+            End If
+            Err.Clear
+            Dim n As String
+            n = CStr(btn.Name)
+            If Err.Number = 0 Then
+                If Left$(n, 4) = "btn_" Then
+                    If InStr(1, n, "btn_" & CStr(macroNames(i)), vbTextCompare) = 1 Then
+                        btn.Delete
+                        Exit For
+                    End If
+                End If
+            End If
+        Next i
+    Next btn
+    On Error GoTo 0
 End Sub
 
 Public Function EnsureTable(ByVal ws As Worksheet, ByVal tableName As String, ByVal headerRow As Long, ByVal headers As Variant) As ListObject
@@ -213,16 +236,26 @@ Public Function NewGuidId() As String
 End Function
 
 Public Sub AddSheetButton(ByVal ws As Worksheet, ByVal caption As String, ByVal macroName As String, ByVal leftPt As Double, ByVal topPt As Double, ByVal widthPt As Double, ByVal heightPt As Double)
-    Dim btn As Shape
-    Set btn = ws.Shapes.AddShape(msoShapeRoundedRectangle, leftPt, topPt, widthPt, heightPt)
-    btn.TextFrame2.TextRange.Text = caption
-    btn.TextFrame2.TextRange.Font.Size = 11
-    btn.TextFrame2.TextRange.Font.Bold = msoTrue
-    btn.Fill.ForeColor.RGB = RGB(33, 115, 70)
-    btn.Line.ForeColor.RGB = RGB(33, 115, 70)
-    btn.TextFrame2.TextRange.Font.Fill.ForeColor.RGB = RGB(255, 255, 255)
+    Dim btn As Object
+    Dim b As Object
+    On Error Resume Next
+    For Each b In ws.Buttons
+        If StrComp(CStr(b.OnAction), macroName, vbTextCompare) = 0 Then b.Delete
+    Next b
+    On Error GoTo 0
+
+    Set btn = ws.Buttons.Add(leftPt, topPt, widthPt, heightPt)
+    btn.Caption = caption
     btn.OnAction = macroName
     btn.Placement = xlMoveAndSize
+
+    On Error Resume Next
+    btn.Font.Name = "Calibri"
+    btn.Font.Size = 11
+    btn.Font.Bold = True
+    btn.Characters.Font.Color = vbWhite
+    btn.Interior.Color = RGB(33, 115, 70)
+    On Error GoTo 0
 End Sub
 
 Public Sub AddSheetButtonAtRange(ByVal ws As Worksheet, ByVal caption As String, ByVal macroName As String, ByVal area As Range)

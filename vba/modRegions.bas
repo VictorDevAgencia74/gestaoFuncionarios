@@ -76,6 +76,59 @@ ErrHandler:
     MsgBox msg, vbExclamation, APP_TITLE
 End Sub
 
+Public Sub Region_DeleteFromForm()
+    On Error GoTo ErrHandler
+    Dim ws As Worksheet
+    Set ws = GetWs(SH_REGIOES)
+    Dim codigo As String
+    codigo = UCase$(Trim$(CStr(ws.Range("B3").Value)))
+    If Len(codigo) = 0 Then Err.Raise vbObjectError + 260, APP_TITLE, "Informe o Codigo da regiao para excluir."
+
+    If Region_HasAllocations(codigo) Then
+        Err.Raise vbObjectError + 261, APP_TITLE, "Nao e possivel excluir: regiao possui alocacoes vinculadas."
+    End If
+
+    If MsgBox("Excluir regiao " & codigo & "?", vbQuestion + vbYesNo, APP_TITLE) <> vbYes Then Exit Sub
+
+    Dim lo As ListObject
+    Set lo = ws.ListObjects(TB_REG)
+    Dim rowIdx As Long
+    rowIdx = Region_FindRowByCode(lo, codigo)
+    If rowIdx = 0 Then Err.Raise vbObjectError + 262, APP_TITLE, "Regiao nao encontrada."
+
+    Dim pwd As String
+    pwd = CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
+    ws.Unprotect Password:=pwd
+    lo.ListRows(rowIdx).Delete
+    ws.Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
+
+    Region_ClearForm
+    Setup_RefreshAfterDataChange
+    MsgBox "Regiao excluida: " & codigo, vbInformation, APP_TITLE
+    Exit Sub
+
+ErrHandler:
+    MsgBox Err.Description, vbExclamation, APP_TITLE
+End Sub
+
+Private Function Region_HasAllocations(ByVal codigo As String) As Boolean
+    Region_HasAllocations = False
+    Dim loA As ListObject
+    Set loA = GetWs(SH_ALOC_DB).ListObjects(TB_ALOC)
+    If loA.DataBodyRange Is Nothing Then Exit Function
+
+    Dim idxReg As Long
+    idxReg = TableColIndex(loA, "RegiaoCodigo")
+
+    Dim r As Long
+    For r = 1 To loA.DataBodyRange.Rows.Count
+        If StrComp(CStr(loA.DataBodyRange.Cells(r, idxReg).Value), codigo, vbTextCompare) = 0 Then
+            Region_HasAllocations = True
+            Exit Function
+        End If
+    Next r
+End Function
+
 Private Function Region_FindRowByCode(ByVal lo As ListObject, ByVal codigo As String) As Long
     If lo.DataBodyRange Is Nothing Then Exit Function
     Dim r As Long

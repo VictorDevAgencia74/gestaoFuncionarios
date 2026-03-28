@@ -122,3 +122,56 @@ ErrHandler:
     MsgBox msg, vbExclamation, APP_TITLE
 End Sub
 
+Private Function Query_GetSelectedAllocationId() As String
+    Dim ws As Worksheet
+    Set ws = GetWs(SH_CONSULTA)
+
+    Dim lo As ListObject
+    Set lo = ws.ListObjects(TB_QUERY)
+    If lo.DataBodyRange Is Nothing Then Exit Function
+
+    Dim cell As Range
+    Set cell = ActiveCell
+    If cell Is Nothing Then Exit Function
+
+    If Intersect(cell, lo.DataBodyRange) Is Nothing Then
+        Err.Raise vbObjectError + 450, APP_TITLE, "Selecione uma linha do resultado na tabela de consulta."
+    End If
+
+    Dim relRow As Long
+    relRow = cell.Row - lo.DataBodyRange.Row + 1
+    If relRow < 1 Or relRow > lo.DataBodyRange.Rows.Count Then Exit Function
+
+    Query_GetSelectedAllocationId = CStr(lo.DataBodyRange.Cells(relRow, 1).Value)
+End Function
+
+Public Sub Query_EditSelectedAllocation()
+    On Error GoTo ErrHandler
+    Dim alocId As String
+    alocId = Query_GetSelectedAllocationId()
+    If Len(Trim$(alocId)) = 0 Then Exit Sub
+
+    Allocation_LoadToFormById alocId
+    GetWs(SH_ALOC_FORM).Activate
+    Exit Sub
+
+ErrHandler:
+    MsgBox Err.Description, vbExclamation, APP_TITLE
+End Sub
+
+Public Sub Query_DeleteSelectedAllocation()
+    On Error GoTo ErrHandler
+    Dim alocId As String
+    alocId = Query_GetSelectedAllocationId()
+    If Len(Trim$(alocId)) = 0 Then Exit Sub
+
+    If MsgBox("Excluir a alocacao selecionada?" & vbCrLf & alocId, vbQuestion + vbYesNo, APP_TITLE) <> vbYes Then Exit Sub
+
+    Allocation_DeleteById alocId
+    Query_Run
+    Exit Sub
+
+ErrHandler:
+    MsgBox Err.Description, vbExclamation, APP_TITLE
+End Sub
+

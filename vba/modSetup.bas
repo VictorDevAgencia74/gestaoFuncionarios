@@ -132,10 +132,11 @@ Private Sub Setup_CreateCadastro()
     ws.Cells.Locked = True
     ws.Range("B4:B9").Locked = False
 
-    RemoveShapesByOnAction ws, "Employee_SaveFromForm", "Employee_ClearForm"
+    RemoveShapesByOnAction ws, "Employee_SaveFromForm", "Employee_ClearForm", "Employee_DeleteFromForm"
 
     AddSheetButtonAtRange ws, "Salvar/Atualizar", "Employee_SaveFromForm", ws.Range("B11:C12")
     AddSheetButtonAtRange ws, "Limpar", "Employee_ClearForm", ws.Range("D11:D12")
+    AddSheetButtonAtRange ws, "Excluir", "Employee_DeleteFromForm", ws.Range("B13:C13")
 
     ws.Range("A3:A9").Font.Bold = True
     ws.Range("A3:A9").VerticalAlignment = xlCenter
@@ -158,7 +159,7 @@ Private Sub Setup_CreateRegioes()
 
     ApplySheetTheme ws, "Regioes", "A1:E1"
 
-    RemoveShapesByOnAction ws, "Region_SaveFromForm", "Region_ClearForm"
+    RemoveShapesByOnAction ws, "Region_SaveFromForm", "Region_ClearForm", "Region_DeleteFromForm"
 
     ws.Range("A2").Value = "Cadastro de Regioes"
     ws.Range("A2").Font.Bold = True
@@ -182,6 +183,7 @@ Private Sub Setup_CreateRegioes()
 
     AddSheetButtonAtRange ws, "Salvar/Atualizar", "Region_SaveFromForm", ws.Range("B8:C9")
     AddSheetButtonAtRange ws, "Limpar", "Region_ClearForm", ws.Range("D8:D9")
+    AddSheetButtonAtRange ws, "Excluir", "Region_DeleteFromForm", ws.Range("B10:C10")
 
     Dim loR As ListObject
     Set loR = EnsureTable(ws, TB_REG, 10, Array("RegiaoCodigo", "RegiaoNome", "EnderecoCompleto", "Supervisor", "CapacidadeMaxima"))
@@ -200,6 +202,11 @@ Private Sub Setup_CreateAlocacao()
     ws.Columns("D:D").ColumnWidth = 20
 
     ApplySheetTheme ws, "Alocacao por Regiao", "A1:D1"
+
+    ws.Range("A2").Value = "AlocacaoID"
+    ws.Range("B2").NumberFormat = "@"
+    ws.Range("B2").Value = ""
+    ws.Range("A2:B2").Font.Color = RGB(240, 240, 240)
 
     ws.Range("A3").Value = "Funcionario"
     ws.Range("A4").Value = "Regiao"
@@ -220,6 +227,7 @@ Private Sub Setup_CreateAlocacao()
     ws.Cells.Locked = True
     ws.Range("B3:B7").Locked = False
     ws.Range("B9:B10").Locked = False
+    ws.Range("B2").Locked = True
 
     AddSheetButtonAtRange ws, "Salvar Alocacao", "Allocation_SaveFromForm", ws.Range("B12:C13")
     AddSheetButtonAtRange ws, "Limpar", "Allocation_ClearForm", ws.Range("D12:D13")
@@ -248,7 +256,7 @@ Private Sub Setup_CreateConsulta()
 
     ApplySheetTheme ws, "Consulta Historica", "A1:F1"
 
-    RemoveShapesByOnAction ws, "Query_Run", "Query_Clear"
+    RemoveShapesByOnAction ws, "Query_Run", "Query_Clear", "Query_EditSelectedAllocation", "Query_DeleteSelectedAllocation"
 
     ws.Range("A3").Value = "Funcionario (ID ou Nome)"
     ws.Range("A4").Value = "Regiao (codigo)"
@@ -263,6 +271,8 @@ Private Sub Setup_CreateConsulta()
 
     AddSheetButtonAtRange ws, "Buscar", "Query_Run", ws.Range("B7:C7")
     AddSheetButtonAtRange ws, "Limpar", "Query_Clear", ws.Range("D7:E7")
+    AddSheetButtonAtRange ws, "Editar", "Query_EditSelectedAllocation", ws.Range("F7:G7")
+    AddSheetButtonAtRange ws, "Excluir", "Query_DeleteSelectedAllocation", ws.Range("H7:I7")
 
     Dim loQ As ListObject
     Set loQ = EnsureTable(ws, TB_QUERY, 10, Array("AlocacaoID", "FuncionarioID", "NomeCompleto", "CPF", "RegiaoCodigo", "RegiaoNome", "DataInicio", "DataFim", "Observacoes"))

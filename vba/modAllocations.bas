@@ -5,6 +5,7 @@ Public Sub Allocation_ClearForm()
     Dim ws As Worksheet
     Set ws = GetWs(SH_ALOC_FORM)
     ws.Unprotect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
+    ws.Range("B2").ClearContents
     ws.Range("B3:B7").ClearContents
     ws.Range("B9").Value = "NAO"
     ws.Range("B10").ClearContents
@@ -15,6 +16,9 @@ Public Sub Allocation_SaveFromForm()
     On Error GoTo ErrHandler
     Dim ws As Worksheet
     Set ws = GetWs(SH_ALOC_FORM)
+
+    Dim alocId As String
+    alocId = Trim$(CStr(ws.Range("B2").Value))
 
     Dim funcionarioId As String
     Dim regiaoCodigo As String
@@ -62,29 +66,55 @@ Public Sub Allocation_SaveFromForm()
     Allocation_ValidateRetroactive dtIni, authFlag, authCode
     wsDb.Unprotect Password:=pwd
 
-    autoClosed = Allocation_TryAutoClosePrevious(lo, funcionarioId, dtIni, dtFim, autoRow, autoOldFim, autoNewFim)
+    Dim rowIdx As Long
+    rowIdx = 0
+    If Len(alocId) > 0 Then rowIdx = Allocation_FindRowById(lo, alocId)
 
-    Allocation_ValidateNoOverlap funcionarioId, dtIni, dtFim
-    Allocation_ValidateCapacity regiaoCodigo, dtIni, dtFim
+    If rowIdx = 0 Then
+        autoClosed = Allocation_TryAutoClosePrevious(lo, funcionarioId, dtIni, dtFim, autoRow, autoOldFim, autoNewFim)
+        Allocation_ValidateNoOverlap funcionarioId, dtIni, dtFim
+        Allocation_ValidateCapacity regiaoCodigo, dtIni, dtFim
 
-    Dim lr As ListRow
-    Set lr = lo.ListRows.Add
-    With lr.Range
-        .Cells(1, TableColIndex(lo, "AlocacaoID")).Value = "A-" & NewGuidId()
-        .Cells(1, TableColIndex(lo, "FuncionarioID")).Value = funcionarioId
-        .Cells(1, TableColIndex(lo, "RegiaoCodigo")).Value = regiaoCodigo
-        .Cells(1, TableColIndex(lo, "DataInicio")).Value = dtIni
-        .Cells(1, TableColIndex(lo, "DataFim")).Value = dtFim
-        .Cells(1, TableColIndex(lo, "Observacoes")).Value = obs
-        .Cells(1, TableColIndex(lo, "DataRegistro")).Value = Now
-        .Cells(1, TableColIndex(lo, "Usuario")).Value = Application.UserName
-    End With
+        Dim lr As ListRow
+        Set lr = lo.ListRows.Add
+        alocId = "A-" & NewGuidId()
+        With lr.Range
+            .Cells(1, TableColIndex(lo, "AlocacaoID")).Value = alocId
+            .Cells(1, TableColIndex(lo, "FuncionarioID")).Value = funcionarioId
+            .Cells(1, TableColIndex(lo, "RegiaoCodigo")).Value = regiaoCodigo
+            .Cells(1, TableColIndex(lo, "DataInicio")).Value = dtIni
+            .Cells(1, TableColIndex(lo, "DataFim")).Value = dtFim
+            .Cells(1, TableColIndex(lo, "Observacoes")).Value = obs
+            .Cells(1, TableColIndex(lo, "DataRegistro")).Value = Now
+            .Cells(1, TableColIndex(lo, "Usuario")).Value = Application.UserName
+        End With
+    Else
+        Allocation_ValidateNoOverlapExcluding lo, funcionarioId, dtIni, dtFim, alocId
+        Allocation_ValidateCapacityExcluding lo, regiaoCodigo, dtIni, dtFim, alocId
+
+        With lo.DataBodyRange.Rows(rowIdx)
+            .Cells(1, TableColIndex(lo, "FuncionarioID")).Value = funcionarioId
+            .Cells(1, TableColIndex(lo, "RegiaoCodigo")).Value = regiaoCodigo
+            .Cells(1, TableColIndex(lo, "DataInicio")).Value = dtIni
+            .Cells(1, TableColIndex(lo, "DataFim")).Value = dtFim
+            .Cells(1, TableColIndex(lo, "Observacoes")).Value = obs
+            .Cells(1, TableColIndex(lo, "Usuario")).Value = Application.UserName
+        End With
+    End If
 
     wsDb.Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
 
     Dashboard_RefreshAll
     Dim msgOk As String
-    msgOk = "Alocacao salva para " & funcionarioId & " em " & regiaoCodigo
+    ws.Unprotect Password:=pwd
+    ws.Range("B2").Value = alocId
+    ws.Protect Password:=pwd, UserInterfaceOnly:=True
+
+    If rowIdx = 0 Then
+        msgOk = "Alocacao salva para " & funcionarioId & " em " & regiaoCodigo
+    Else
+        msgOk = "Alocacao atualizada: " & alocId
+    End If
     If autoClosed Then
         msgOk = msgOk & vbCrLf & "Alocacao anterior encerrada em " & Format$(autoNewFim, "dd/mm/yyyy")
     End If
@@ -144,6 +174,30 @@ Private Sub Allocation_ValidateNoOverlap(ByVal funcionarioId As String, ByVal dt
     Next r
 End Sub
 
+Private Sub Allocation_ValidateNoOverlapExcluding(ByVal lo As ListObject, ByVal funcionarioId As String, ByVal dtIni As Date, ByVal dtFim As Date, ByVal excludeAlocId As String)
+    If lo.DataBodyRange Is Nothing Then Exit Sub
+
+    Dim idxAid As Long
+    Dim idxEmp As Long
+    Dim idxIni As Long
+    Dim idxFim As Long
+    idxAid = TableColIndex(lo, "AlocacaoID")
+    idxEmp = TableColIndex(lo, "FuncionarioID")
+    idxIni = TableColIndex(lo, "DataInicio")
+    idxFim = TableColIndex(lo, "DataFim")
+
+    Dim r As Long
+    For r = 1 To lo.DataBodyRange.Rows.Count
+        If StrComp(CStr(lo.DataBodyRange.Cells(r, idxAid).Value), excludeAlocId, vbTextCompare) <> 0 Then
+            If StrComp(CStr(lo.DataBodyRange.Cells(r, idxEmp).Value), funcionarioId, vbTextCompare) = 0 Then
+                If DateRangesOverlap(dtIni, dtFim, CDate(lo.DataBodyRange.Cells(r, idxIni).Value), CDate(lo.DataBodyRange.Cells(r, idxFim).Value)) Then
+                    Err.Raise vbObjectError + 330, APP_TITLE, "Sobreposicao de periodos para o mesmo funcionario."
+                End If
+            End If
+        End If
+    Next r
+End Sub
+
 Private Sub Allocation_ValidateCapacity(ByVal regiaoCodigo As String, ByVal dtIni As Date, ByVal dtFim As Date)
     Dim cap As Long
     cap = Region_GetCapacity(regiaoCodigo)
@@ -174,6 +228,106 @@ Private Sub Allocation_ValidateCapacity(ByVal regiaoCodigo As String, ByVal dtIn
     If countOverlap + 1 > cap Then
         Err.Raise vbObjectError + 340, APP_TITLE, "Capacidade maxima excedida para o periodo informado."
     End If
+End Sub
+
+Private Sub Allocation_ValidateCapacityExcluding(ByVal lo As ListObject, ByVal regiaoCodigo As String, ByVal dtIni As Date, ByVal dtFim As Date, ByVal excludeAlocId As String)
+    Dim cap As Long
+    cap = Region_GetCapacity(regiaoCodigo)
+    If cap <= 0 Then Exit Sub
+    If lo.DataBodyRange Is Nothing Then Exit Sub
+
+    Dim idxAid As Long
+    Dim idxReg As Long
+    Dim idxIni As Long
+    Dim idxFim As Long
+    idxAid = TableColIndex(lo, "AlocacaoID")
+    idxReg = TableColIndex(lo, "RegiaoCodigo")
+    idxIni = TableColIndex(lo, "DataInicio")
+    idxFim = TableColIndex(lo, "DataFim")
+
+    Dim countOverlap As Long
+    Dim r As Long
+    countOverlap = 0
+    For r = 1 To lo.DataBodyRange.Rows.Count
+        If StrComp(CStr(lo.DataBodyRange.Cells(r, idxAid).Value), excludeAlocId, vbTextCompare) <> 0 Then
+            If StrComp(CStr(lo.DataBodyRange.Cells(r, idxReg).Value), regiaoCodigo, vbTextCompare) = 0 Then
+                If DateRangesOverlap(dtIni, dtFim, CDate(lo.DataBodyRange.Cells(r, idxIni).Value), CDate(lo.DataBodyRange.Cells(r, idxFim).Value)) Then
+                    countOverlap = countOverlap + 1
+                End If
+            End If
+        End If
+    Next r
+
+    If countOverlap + 1 > cap Then
+        Err.Raise vbObjectError + 340, APP_TITLE, "Capacidade maxima excedida para o periodo informado."
+    End If
+End Sub
+
+Private Function Allocation_FindRowById(ByVal lo As ListObject, ByVal alocId As String) As Long
+    Allocation_FindRowById = 0
+    If lo.DataBodyRange Is Nothing Then Exit Function
+    If Len(Trim$(alocId)) = 0 Then Exit Function
+
+    Dim idxAid As Long
+    idxAid = TableColIndex(lo, "AlocacaoID")
+    If idxAid = 0 Then Exit Function
+
+    Dim r As Long
+    For r = 1 To lo.DataBodyRange.Rows.Count
+        If StrComp(CStr(lo.DataBodyRange.Cells(r, idxAid).Value), alocId, vbTextCompare) = 0 Then
+            Allocation_FindRowById = r
+            Exit Function
+        End If
+    Next r
+End Function
+
+Public Sub Allocation_LoadToFormById(ByVal alocId As String)
+    Dim wsDb As Worksheet
+    Set wsDb = GetWs(SH_ALOC_DB)
+    Dim lo As ListObject
+    Set lo = wsDb.ListObjects(TB_ALOC)
+    If lo.DataBodyRange Is Nothing Then Err.Raise vbObjectError + 360, APP_TITLE, "Nao ha alocacoes para carregar."
+
+    Dim rowIdx As Long
+    rowIdx = Allocation_FindRowById(lo, alocId)
+    If rowIdx = 0 Then Err.Raise vbObjectError + 361, APP_TITLE, "Alocacao nao encontrada: " & alocId
+
+    Dim ws As Worksheet
+    Set ws = GetWs(SH_ALOC_FORM)
+    Dim pwd As String
+    pwd = CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
+    ws.Unprotect Password:=pwd
+
+    ws.Range("B2").Value = alocId
+    ws.Range("B3").Value = CStr(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "FuncionarioID")).Value)
+    ws.Range("B4").Value = CStr(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "RegiaoCodigo")).Value)
+    ws.Range("B5").Value = CDate(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "DataInicio")).Value)
+    ws.Range("B6").Value = CDate(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "DataFim")).Value)
+    ws.Range("B7").Value = CStr(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "Observacoes")).Value)
+    ws.Range("B9").Value = "NAO"
+    ws.Range("B10").ClearContents
+
+    ws.Protect Password:=pwd, UserInterfaceOnly:=True
+End Sub
+
+Public Sub Allocation_DeleteById(ByVal alocId As String)
+    Dim wsDb As Worksheet
+    Set wsDb = GetWs(SH_ALOC_DB)
+    Dim lo As ListObject
+    Set lo = wsDb.ListObjects(TB_ALOC)
+    If lo.DataBodyRange Is Nothing Then Err.Raise vbObjectError + 370, APP_TITLE, "Nao ha alocacoes para excluir."
+
+    Dim rowIdx As Long
+    rowIdx = Allocation_FindRowById(lo, alocId)
+    If rowIdx = 0 Then Err.Raise vbObjectError + 371, APP_TITLE, "Alocacao nao encontrada: " & alocId
+
+    Dim pwd As String
+    pwd = CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
+    wsDb.Unprotect Password:=pwd
+    lo.ListRows(rowIdx).Delete
+    wsDb.Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
+
+    Setup_RefreshAfterDataChange
 End Sub
 
 Private Function Allocation_TryAutoClosePrevious(ByVal lo As ListObject, ByVal funcionarioId As String, ByVal dtIni As Date, ByVal dtFim As Date, ByRef rowIndex As Long, ByRef oldFim As Date, ByRef newFim As Date) As Boolean
