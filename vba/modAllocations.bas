@@ -43,21 +43,29 @@ Public Sub Allocation_SaveFromForm()
     dtFim = CDate(dtFimV)
     If dtIni > dtFim Then Err.Raise vbObjectError + 304, APP_TITLE, "Data de inicio nao pode ser maior que data de termino."
 
+    Dim pwd As String
+    pwd = CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
+
     If Not Employee_IsActive(funcionarioId) Then Err.Raise vbObjectError + 305, APP_TITLE, "Funcionario inativo ou inexistente."
     If Region_GetCapacity(regiaoCodigo) <= 0 Then Err.Raise vbObjectError + 306, APP_TITLE, "Regiao inexistente ou sem capacidade configurada."
-
-    Allocation_ValidateRetroactive dtIni, authFlag, authCode
-    Allocation_ValidateNoOverlap funcionarioId, dtIni, dtFim
-    Allocation_ValidateCapacity regiaoCodigo, dtIni, dtFim
 
     Dim lo As ListObject
     Dim wsDb As Worksheet
     Set wsDb = GetWs(SH_ALOC_DB)
     Set lo = wsDb.ListObjects(TB_ALOC)
 
-    Dim pwd As String
-    pwd = CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
+    Dim autoClosed As Boolean
+    Dim autoRow As Long
+    Dim autoOldFim As Date
+    Dim autoNewFim As Date
+
+    Allocation_ValidateRetroactive dtIni, authFlag, authCode
     wsDb.Unprotect Password:=pwd
+
+    autoClosed = Allocation_TryAutoClosePrevious(lo, funcionarioId, dtIni, dtFim, autoRow, autoOldFim, autoNewFim)
+
+    Allocation_ValidateNoOverlap funcionarioId, dtIni, dtFim
+    Allocation_ValidateCapacity regiaoCodigo, dtIni, dtFim
 
     Dim lr As ListRow
     Set lr = lo.ListRows.Add
@@ -75,7 +83,12 @@ Public Sub Allocation_SaveFromForm()
     wsDb.Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
 
     Dashboard_RefreshAll
-    MsgBox "Alocacao salva para " & funcionarioId & " em " & regiaoCodigo, vbInformation, APP_TITLE
+    Dim msgOk As String
+    msgOk = "Alocacao salva para " & funcionarioId & " em " & regiaoCodigo
+    If autoClosed Then
+        msgOk = msgOk & vbCrLf & "Alocacao anterior encerrada em " & Format$(autoNewFim, "dd/mm/yyyy")
+    End If
+    MsgBox msgOk, vbInformation, APP_TITLE
     Exit Sub
 ErrHandler:
     Dim errNum As Long
@@ -84,8 +97,12 @@ ErrHandler:
     errDesc = Err.Description
 
     On Error Resume Next
+    If autoClosed And Not wsDb Is Nothing Then
+        wsDb.Unprotect Password:=pwd
+        lo.DataBodyRange.Cells(autoRow, TableColIndex(lo, "DataFim")).Value = autoOldFim
+    End If
     If Not wsDb Is Nothing Then
-        wsDb.Protect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL)), UserInterfaceOnly:=True, AllowFiltering:=True
+        wsDb.Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
     End If
     Dim msg As String
     msg = errDesc
@@ -158,4 +175,54 @@ Private Sub Allocation_ValidateCapacity(ByVal regiaoCodigo As String, ByVal dtIn
         Err.Raise vbObjectError + 340, APP_TITLE, "Capacidade maxima excedida para o periodo informado."
     End If
 End Sub
+
+Private Function Allocation_TryAutoClosePrevious(ByVal lo As ListObject, ByVal funcionarioId As String, ByVal dtIni As Date, ByVal dtFim As Date, ByRef rowIndex As Long, ByRef oldFim As Date, ByRef newFim As Date) As Boolean
+    Allocation_TryAutoClosePrevious = False
+    rowIndex = 0
+
+    If lo.DataBodyRange Is Nothing Then Exit Function
+
+    Dim idxEmp As Long
+    Dim idxIni As Long
+    Dim idxFim As Long
+    idxEmp = TableColIndex(lo, "FuncionarioID")
+    idxIni = TableColIndex(lo, "DataInicio")
+    idxFim = TableColIndex(lo, "DataFim")
+    If idxEmp = 0 Or idxIni = 0 Or idxFim = 0 Then Exit Function
+
+    Dim r As Long
+    Dim hits As Long
+    hits = 0
+
+    For r = 1 To lo.DataBodyRange.Rows.Count
+        If StrComp(CStr(lo.DataBodyRange.Cells(r, idxEmp).Value), funcionarioId, vbTextCompare) = 0 Then
+            If IsDate(lo.DataBodyRange.Cells(r, idxIni).Value) And IsDate(lo.DataBodyRange.Cells(r, idxFim).Value) Then
+                Dim oldIniLocal As Date
+                Dim oldFimLocal As Date
+                oldIniLocal = CDate(lo.DataBodyRange.Cells(r, idxIni).Value)
+                oldFimLocal = CDate(lo.DataBodyRange.Cells(r, idxFim).Value)
+
+                If DateRangesOverlap(dtIni, dtFim, oldIniLocal, oldFimLocal) Then
+                    If dtIni <= oldIniLocal Then
+                        Err.Raise vbObjectError + 331, APP_TITLE, "Existe uma alocacao que inicia em " & Format$(oldIniLocal, "dd/mm/yyyy") & ". Para realocar, use DataInicio maior que essa data ou ajuste a alocacao anterior."
+                    End If
+                    hits = hits + 1
+                    rowIndex = r
+                    oldFim = oldFimLocal
+                End If
+            End If
+        End If
+    Next r
+
+    If hits = 0 Then Exit Function
+    If hits > 1 Then Err.Raise vbObjectError + 332, APP_TITLE, "Foram encontradas multiplas alocacoes sobrepostas para este funcionario. Corrija a base antes de realocar."
+
+    newFim = DateAdd("d", -1, dtIni)
+    If newFim < CDate(lo.DataBodyRange.Cells(rowIndex, idxIni).Value) Then
+        Err.Raise vbObjectError + 333, APP_TITLE, "Data de realocacao invalida para encerrar a alocacao anterior."
+    End If
+
+    lo.DataBodyRange.Cells(rowIndex, idxFim).Value = newFim
+    Allocation_TryAutoClosePrevious = True
+End Function
 

@@ -57,6 +57,8 @@ Private Sub Setup_CreateConfig()
         ws.Range(CFG_RETRO_CODE_CELL).Value = "RETRO-OK"
         ws.Range("A4").Value = "DiasPermitidosRetroativo"
         ws.Range(CFG_RETRO_ALLOW_DAYS_CELL).Value = 0
+        ws.Range("A5").Value = "DiasVencimentoAlocacao"
+        ws.Range(CFG_EXPIRY_WARN_DAYS_CELL).Value = 7
         ws.Range("A6").Value = "StatusFuncionarios"
         ws.Range("A7").Value = "Ativo"
         ws.Range("A8").Value = "Inativo"
@@ -71,6 +73,8 @@ Private Sub Setup_CreateConfig()
         ws.Range("G9").Value = "Coordenador"
         ws.Range("G10").Value = "Supervisor"
     End If
+    If Len(CStr(ws.Range("A5").Value)) = 0 Then ws.Range("A5").Value = "DiasVencimentoAlocacao"
+    If Not IsNumeric(ws.Range(CFG_EXPIRY_WARN_DAYS_CELL).Value) Or CLng(ws.Range(CFG_EXPIRY_WARN_DAYS_CELL).Value) < 0 Then ws.Range(CFG_EXPIRY_WARN_DAYS_CELL).Value = 7
     ws.Visible = xlSheetVisible
 End Sub
 
@@ -286,10 +290,14 @@ Private Sub Setup_CreateDashboard()
     ws.Columns("I:I").ColumnWidth = 16
     ws.Columns("J:J").ColumnWidth = 16
     ws.Columns("K:K").ColumnWidth = 16
+    ws.Columns("M:M").ColumnWidth = 16
+    ws.Columns("N:N").ColumnWidth = 16
+    ws.Columns("O:O").ColumnWidth = 16
+    ws.Columns("P:P").ColumnWidth = 16
 
     ApplySheetTheme ws, "Dashboard", "A1:F1"
 
-    RemoveShapesByOnAction ws, "Dashboard_RefreshAll"
+    RemoveShapesByOnAction ws, "Dashboard_RefreshAll", "Backup_CreateNow", "Backup_Import"
 
     ws.Range("A3").Value = "Indicadores"
     ws.Range("A3").Font.Bold = True
@@ -304,6 +312,8 @@ Private Sub Setup_CreateDashboard()
     ws.Range("B5:B6").Borders.Color = RGB(220, 220, 220)
 
     AddSheetButtonAtRange ws, "Atualizar", "Dashboard_RefreshAll", ws.Range("D3:E4")
+    AddSheetButtonAtRange ws, "Fazer Backup", "Backup_CreateNow", ws.Range("H3:I4")
+    AddSheetButtonAtRange ws, "Importar Backup", "Backup_Import", ws.Range("J3:K4")
 
     Dim loD As ListObject
     Set loD = EnsureTable(ws, TB_DASH, 9, Array("RegiaoCodigo", "RegiaoNome", "CapacidadeMaxima", "AlocadosHoje", "TaxaOcupacao"))

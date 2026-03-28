@@ -27,13 +27,18 @@ Este repositório contém módulos VBA que montam (do zero) uma solução em Exc
 - `Query_Run`: executa consulta histórica na aba `Consulta`.
 - `Dashboard_RefreshAll`: atualiza pivôs/indicadores/gráficos.
 - `Reports_GenerateMonthlyPDFs`: gera PDFs mensais em `reports/`.
-- `Theme_Toggle`: alterna tema claro/escuro (config em `Config!B5`).
-- `UI_LayoutDesktop` / `UI_LayoutTablet` / `UI_LayoutMobile`: ajusta zoom/layout (config em `Config!B12`).
+- `Backup_CreateNow`: cria um backup do arquivo na pasta `bkp/`.
+- `Backup_Import`: importa um backup (substitui dados e config).
 
-### UI/UX
+### Backup automático ao fechar
 
-- Especificação visual: `docs/design-system.md`
-- Checklist de validação: `docs/testes-ui.md`
+Para perguntar se deseja fazer backup toda vez que fechar o arquivo, adicione este evento no módulo `ThisWorkbook` (VBA Editor → Microsoft Excel Objects → ThisWorkbook):
+
+```vb
+Private Sub Workbook_BeforeClose(Cancel As Boolean)
+    Backup_HandleBeforeClose Cancel
+End Sub
+```
 
 ### Observações
 
