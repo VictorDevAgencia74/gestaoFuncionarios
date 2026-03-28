@@ -1,6 +1,63 @@
 Attribute VB_Name = "modUtils"
 Option Explicit
 
+Public Function UI_FontBase() As String
+    UI_FontBase = "Segoe UI"
+End Function
+
+Public Function UI_ColorPrimary() As Long
+    UI_ColorPrimary = RGB(37, 99, 235)
+End Function
+
+Public Function UI_ColorSurface() As Long
+    UI_ColorSurface = RGB(255, 255, 255)
+End Function
+
+Public Function UI_ColorSurfaceAlt() As Long
+    UI_ColorSurfaceAlt = RGB(248, 250, 252)
+End Function
+
+Public Function UI_ColorBorder() As Long
+    UI_ColorBorder = RGB(226, 232, 240)
+End Function
+
+Public Function UI_ColorText() As Long
+    UI_ColorText = RGB(15, 23, 42)
+End Function
+
+Public Function UI_ColorTextMuted() As Long
+    UI_ColorTextMuted = RGB(71, 85, 105)
+End Function
+
+Public Function UI_ColorTextOnPrimary() As Long
+    UI_ColorTextOnPrimary = RGB(255, 255, 255)
+End Function
+
+Public Sub UI_StyleInputs(ByVal area As Range)
+    area.Font.Name = UI_FontBase()
+    area.Font.Color = UI_ColorText()
+    area.Interior.Color = UI_ColorSurfaceAlt()
+    area.Borders.LineStyle = xlContinuous
+    area.Borders.Color = UI_ColorBorder()
+End Sub
+
+Public Sub UI_StyleLabels(ByVal area As Range)
+    area.Font.Name = UI_FontBase()
+    area.Font.Color = UI_ColorText()
+    area.Font.Bold = True
+End Sub
+
+Public Sub UI_StyleKpi(ByVal area As Range)
+    area.Font.Name = UI_FontBase()
+    area.Font.Color = UI_ColorText()
+    area.Font.Bold = True
+    area.Interior.Color = UI_ColorSurfaceAlt()
+    area.Borders.LineStyle = xlContinuous
+    area.Borders.Color = UI_ColorBorder()
+    area.HorizontalAlignment = xlCenter
+    area.VerticalAlignment = xlCenter
+End Sub
+
 Public Function GetWs(ByVal sheetName As String) As Worksheet
     Set GetWs = ThisWorkbook.Worksheets(sheetName)
 End Function
@@ -40,8 +97,10 @@ End Function
 Public Sub ClearSheet(ByVal ws As Worksheet)
     ws.Cells.Clear
     ws.Cells.NumberFormat = "General"
-    ws.Cells.Font.Name = "Calibri"
+    ws.Cells.Font.Name = UI_FontBase()
     ws.Cells.Font.Size = 11
+    ws.Cells.Font.Color = UI_ColorText()
+    ws.Cells.Interior.Color = UI_ColorSurface()
 End Sub
 
 Public Sub ApplySheetTheme(ByVal ws As Worksheet, ByVal titleText As String, ByVal titleRangeAddress As String)
@@ -50,6 +109,10 @@ Public Sub ApplySheetTheme(ByVal ws As Worksheet, ByVal titleText As String, ByV
     ws.Cells.HorizontalAlignment = xlLeft
     ws.Rows.RowHeight = 18
     ws.Columns.ColumnWidth = 12
+    ws.Cells.Font.Name = UI_FontBase()
+    ws.Cells.Font.Size = 11
+    ws.Cells.Font.Color = UI_ColorText()
+    ws.Cells.Interior.Color = UI_ColorSurface()
 
     ws.Range(titleRangeAddress).UnMerge
     ws.Range(titleRangeAddress).Merge
@@ -57,12 +120,14 @@ Public Sub ApplySheetTheme(ByVal ws As Worksheet, ByVal titleText As String, ByV
     With ws.Range(titleRangeAddress)
         .Font.Size = 18
         .Font.Bold = True
-        .Font.Color = RGB(255, 255, 255)
-        .Interior.Color = RGB(33, 115, 70)
+        .Font.Color = UI_ColorTextOnPrimary()
+        .Interior.Color = UI_ColorPrimary()
         .HorizontalAlignment = xlLeft
         .VerticalAlignment = xlCenter
     End With
     ws.Rows(ws.Range(titleRangeAddress).Row).RowHeight = 34
+    ws.Range(titleRangeAddress).Borders(xlEdgeBottom).LineStyle = xlContinuous
+    ws.Range(titleRangeAddress).Borders(xlEdgeBottom).Color = UI_ColorBorder()
 
     Dim prev As Worksheet
     On Error Resume Next
@@ -132,10 +197,24 @@ Public Function EnsureTable(ByVal ws As Worksheet, ByVal tableName As String, By
         Next i
         Set lo = ws.ListObjects.Add(xlSrcRange, ws.Range(ws.Cells(headerRow, 1), ws.Cells(headerRow + 1, lastCol)), , xlYes)
         lo.Name = tableName
-        lo.TableStyle = "TableStyleMedium2"
+        lo.TableStyle = "TableStyleMedium9"
     Else
-        For i = LBound(headers) To UBound(headers)
-            lo.HeaderRowRange.Cells(1, 1 + (i - LBound(headers))).Value = headers(i)
+        lastCol = UBound(headers) - LBound(headers) + 1
+
+        On Error Resume Next
+        lo.TableStyle = "TableStyleMedium9"
+        On Error GoTo 0
+
+        If lo.ListColumns.Count < lastCol Then
+            For i = lo.ListColumns.Count + 1 To lastCol
+                lo.ListColumns.Add
+            Next i
+        End If
+
+        For i = 1 To lastCol
+            On Error Resume Next
+            lo.ListColumns(i).Name = CStr(headers(LBound(headers) + (i - 1)))
+            On Error GoTo 0
         Next i
     End If
 
@@ -236,25 +315,39 @@ Public Function NewGuidId() As String
 End Function
 
 Public Sub AddSheetButton(ByVal ws As Worksheet, ByVal caption As String, ByVal macroName As String, ByVal leftPt As Double, ByVal topPt As Double, ByVal widthPt As Double, ByVal heightPt As Double)
-    Dim btn As Object
-    Dim b As Object
+    Dim shp As Object
+
     On Error Resume Next
+    Dim b As Object
     For Each b In ws.Buttons
         If StrComp(CStr(b.OnAction), macroName, vbTextCompare) = 0 Then b.Delete
     Next b
     On Error GoTo 0
 
-    Set btn = ws.Buttons.Add(leftPt, topPt, widthPt, heightPt)
-    btn.Caption = caption
-    btn.OnAction = macroName
-    btn.Placement = xlMoveAndSize
+    Dim padX As Double
+    Dim padY As Double
+    padX = 6
+    padY = 4
+
+    If widthPt < (padX * 2 + 10) Then padX = 2
+    If heightPt < (padY * 2 + 10) Then padY = 2
+
+    Set shp = ws.Shapes.AddShape(5, leftPt + padX, topPt + padY, widthPt - (padX * 2), heightPt - (padY * 2))
 
     On Error Resume Next
-    btn.Font.Name = "Calibri"
-    btn.Font.Size = 11
-    btn.Font.Bold = True
-    btn.Characters.Font.Color = vbWhite
-    btn.Interior.Color = RGB(33, 115, 70)
+    shp.TextFrame.Characters.Text = caption
+    shp.TextFrame.Characters.Font.Name = UI_FontBase()
+    shp.TextFrame.Characters.Font.Size = 11
+    shp.TextFrame.Characters.Font.Bold = True
+    shp.TextFrame.Characters.Font.Color = UI_ColorTextOnPrimary()
+    shp.TextFrame.HorizontalAlignment = xlHAlignCenter
+    shp.TextFrame.VerticalAlignment = xlVAlignCenter
+    shp.Fill.ForeColor.RGB = UI_ColorPrimary()
+    shp.Line.ForeColor.RGB = UI_ColorPrimary()
+    shp.Shadow.Visible = False
+    shp.Adjustments.Item(1) = 0.18
+    shp.OnAction = macroName
+    shp.Placement = xlMoveAndSize
     On Error GoTo 0
 End Sub
 

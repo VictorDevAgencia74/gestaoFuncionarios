@@ -5,7 +5,7 @@ Public Sub Employee_ClearForm()
     Dim ws As Worksheet
     Set ws = GetWs(SH_CADASTRO)
     ws.Unprotect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
-    ws.Range("B3:B9").ClearContents
+    ws.Range("B3:D9").ClearContents
     ws.Range("B3").Value = "(automatico)"
     ws.Protect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL)), UserInterfaceOnly:=True
 End Sub

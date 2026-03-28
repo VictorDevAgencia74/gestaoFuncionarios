@@ -5,7 +5,7 @@ Public Sub Query_Clear()
     Dim ws As Worksheet
     Set ws = GetWs(SH_CONSULTA)
     ws.Unprotect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
-    ws.Range("B3:B6").ClearContents
+    ws.Range("B3:D6").ClearContents
 
     Dim lo As ListObject
     Set lo = ws.ListObjects(TB_QUERY)

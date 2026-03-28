@@ -6,9 +6,9 @@ Public Sub Allocation_ClearForm()
     Set ws = GetWs(SH_ALOC_FORM)
     ws.Unprotect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
     ws.Range("B2").ClearContents
-    ws.Range("B3:B7").ClearContents
+    ws.Range("B3:D7").ClearContents
+    ws.Range("B9:D10").ClearContents
     ws.Range("B9").Value = "NAO"
-    ws.Range("B10").ClearContents
     ws.Protect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL)), UserInterfaceOnly:=True
 End Sub
 

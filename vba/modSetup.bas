@@ -5,6 +5,8 @@ Public Sub Setup_InitializeWorkbook()
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
 
+    Setup_UnprotectAllSafe
+
     Setup_CreateConfig
     Setup_CreateDatabaseSheets
     Setup_CreateCadastro
@@ -12,6 +14,7 @@ Public Sub Setup_InitializeWorkbook()
     Setup_CreateAlocacao
     Setup_CreateConsulta
     Setup_CreateDashboard
+    Setup_CreateVersoes
     Setup_CreateRelatorio
     Setup_RefreshAfterDataChange
     Setup_ProtectAll
@@ -19,6 +22,23 @@ Public Sub Setup_InitializeWorkbook()
     Application.DisplayAlerts = True
     Application.ScreenUpdating = True
     MsgBox "Estrutura criada/atualizada com sucesso.", vbInformation, APP_TITLE
+End Sub
+
+Private Sub Setup_UnprotectAllSafe()
+    Dim pwd As String
+    pwd = "alocacao"
+
+    On Error Resume Next
+    pwd = CStr(GetWs(SH_CONFIG).Range(CFG_PROTECT_PWD_CELL).Value)
+    If Len(Trim$(pwd)) = 0 Then pwd = "alocacao"
+    On Error GoTo 0
+
+    Dim ws As Worksheet
+    On Error Resume Next
+    For Each ws In ThisWorkbook.Worksheets
+        ws.Unprotect Password:=pwd
+    Next ws
+    On Error GoTo 0
 End Sub
 
 Public Sub Setup_RefreshAfterDataChange()
@@ -129,27 +149,38 @@ Private Sub Setup_CreateCadastro()
     ws.Range("B5").NumberFormat = "@"
     ws.Range("B6").NumberFormat = "dd/mm/yyyy"
 
+    ws.Range("B3:D3").Merge
+    ws.Range("B4:D4").Merge
+    ws.Range("B5:D5").Merge
+    ws.Range("B6:D6").Merge
+    ws.Range("B7:D7").Merge
+    ws.Range("B8:D8").Merge
+    ws.Range("B9:D9").Merge
+
+    ws.Rows("2:2").RowHeight = 10
+    ws.Rows("3:9").RowHeight = 22
+    ws.Rows("10:10").RowHeight = 10
+    ws.Rows("11:13").RowHeight = 28
+
     ws.Cells.Locked = True
-    ws.Range("B4:B9").Locked = False
+    ws.Range("B4:D9").Locked = False
 
     RemoveShapesByOnAction ws, "Employee_SaveFromForm", "Employee_ClearForm", "Employee_DeleteFromForm"
 
     AddSheetButtonAtRange ws, "Salvar/Atualizar", "Employee_SaveFromForm", ws.Range("B11:C12")
     AddSheetButtonAtRange ws, "Limpar", "Employee_ClearForm", ws.Range("D11:D12")
-    AddSheetButtonAtRange ws, "Excluir", "Employee_DeleteFromForm", ws.Range("B13:C13")
+    AddSheetButtonAtRange ws, "Excluir", "Employee_DeleteFromForm", ws.Range("B13:D13")
 
-    ws.Range("A3:A9").Font.Bold = True
     ws.Range("A3:A9").VerticalAlignment = xlCenter
-    ws.Range("B3:B9").Interior.Color = RGB(242, 242, 242)
-    ws.Range("B3:B9").Borders.LineStyle = xlContinuous
-    ws.Range("B3:B9").Borders.Color = RGB(220, 220, 220)
+    UI_StyleLabels ws.Range("A3:A9")
+    UI_StyleInputs ws.Range("B3:D9")
 End Sub
 
 Private Sub Setup_CreateRegioes()
     Dim ws As Worksheet
     Set ws = EnsureWorksheet(SH_REGIOES)
     ws.Unprotect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
-    ws.Range("A1:E9").Clear
+    ws.Range("A1:E12").Clear
 
     ws.Columns("A:A").ColumnWidth = 22
     ws.Columns("B:B").ColumnWidth = 48
@@ -171,23 +202,32 @@ Private Sub Setup_CreateRegioes()
     ws.Range("A6").Value = "Supervisor"
     ws.Range("A7").Value = "CapacidadeMaxima"
 
-    ws.Range("A3:A7").Font.Bold = True
+    ws.Range("B3:D3").Merge
+    ws.Range("B4:D4").Merge
+    ws.Range("B5:D5").Merge
+    ws.Range("B6:D6").Merge
+    ws.Range("B7:D7").Merge
 
-    ws.Range("B3:B7").Interior.Color = RGB(242, 242, 242)
-    ws.Range("B3:B7").Borders.LineStyle = xlContinuous
-    ws.Range("B3:B7").Borders.Color = RGB(220, 220, 220)
+    ws.Rows("2:2").RowHeight = 10
+    ws.Rows("3:7").RowHeight = 22
+    ws.Rows("8:8").RowHeight = 10
+    ws.Rows("9:10").RowHeight = 28
+    ws.Rows("11:11").RowHeight = 10
+
+    UI_StyleLabels ws.Range("A3:A7")
+    UI_StyleInputs ws.Range("B3:D7")
     ws.Range("B7").NumberFormat = "0"
 
     ws.Cells.Locked = True
-    ws.Range("B3:B7").Locked = False
+    ws.Range("B3:D7").Locked = False
 
-    AddSheetButtonAtRange ws, "Salvar/Atualizar", "Region_SaveFromForm", ws.Range("B8:C9")
-    AddSheetButtonAtRange ws, "Limpar", "Region_ClearForm", ws.Range("D8:D9")
+    AddSheetButtonAtRange ws, "Salvar/Atualizar", "Region_SaveFromForm", ws.Range("B9:C9")
+    AddSheetButtonAtRange ws, "Limpar", "Region_ClearForm", ws.Range("D9:E9")
     AddSheetButtonAtRange ws, "Excluir", "Region_DeleteFromForm", ws.Range("B10:C10")
 
     Dim loR As ListObject
-    Set loR = EnsureTable(ws, TB_REG, 10, Array("RegiaoCodigo", "RegiaoNome", "EnderecoCompleto", "Supervisor", "CapacidadeMaxima"))
-    ws.Range("A10").EntireRow.RowHeight = 18
+    Set loR = EnsureTable(ws, TB_REG, 12, Array("RegiaoCodigo", "RegiaoNome", "EnderecoCompleto", "Supervisor", "CapacidadeMaxima"))
+    ws.Range("A12").EntireRow.RowHeight = 18
     ws.Columns.AutoFit
 End Sub
 
@@ -222,23 +262,34 @@ Private Sub Setup_CreateAlocacao()
     ws.Rows("7:7").RowHeight = 60
     ws.Range("B7").WrapText = True
 
+    ws.Range("B3:D3").Merge
+    ws.Range("B4:D4").Merge
+    ws.Range("B5:D5").Merge
+    ws.Range("B6:D6").Merge
+    ws.Range("B7:D7").Merge
+    ws.Range("B9:D9").Merge
+    ws.Range("B10:D10").Merge
+
+    ws.Rows("2:2").RowHeight = 10
+    ws.Rows("3:6").RowHeight = 22
+    ws.Rows("8:8").RowHeight = 10
+    ws.Rows("9:10").RowHeight = 22
+    ws.Rows("11:11").RowHeight = 10
+    ws.Rows("12:13").RowHeight = 28
+
     RemoveShapesByOnAction ws, "Allocation_SaveFromForm", "Allocation_ClearForm"
 
     ws.Cells.Locked = True
-    ws.Range("B3:B7").Locked = False
-    ws.Range("B9:B10").Locked = False
+    ws.Range("B3:D7").Locked = False
+    ws.Range("B9:D10").Locked = False
     ws.Range("B2").Locked = True
 
     AddSheetButtonAtRange ws, "Salvar Alocacao", "Allocation_SaveFromForm", ws.Range("B12:C13")
     AddSheetButtonAtRange ws, "Limpar", "Allocation_ClearForm", ws.Range("D12:D13")
 
-    ws.Range("A3:A10").Font.Bold = True
-    ws.Range("B3:B6").Interior.Color = RGB(242, 242, 242)
-    ws.Range("B9:B10").Interior.Color = RGB(242, 242, 242)
-    ws.Range("B3:B6").Borders.LineStyle = xlContinuous
-    ws.Range("B9:B10").Borders.LineStyle = xlContinuous
-    ws.Range("B3:B6").Borders.Color = RGB(220, 220, 220)
-    ws.Range("B9:B10").Borders.Color = RGB(220, 220, 220)
+    UI_StyleLabels ws.Range("A3:A10")
+    UI_StyleInputs ws.Range("B3:D7")
+    UI_StyleInputs ws.Range("B9:D10")
 End Sub
 
 Private Sub Setup_CreateConsulta()
@@ -266,8 +317,18 @@ Private Sub Setup_CreateConsulta()
     ws.Range("B5").NumberFormat = "dd/mm/yyyy"
     ws.Range("B6").NumberFormat = "dd/mm/yyyy"
 
+    ws.Range("B3:D3").Merge
+    ws.Range("B4:D4").Merge
+    ws.Range("B5:D5").Merge
+    ws.Range("B6:D6").Merge
+
+    ws.Rows("2:2").RowHeight = 10
+    ws.Rows("3:6").RowHeight = 22
+    ws.Rows("7:7").RowHeight = 28
+    ws.Rows("8:8").RowHeight = 10
+
     ws.Cells.Locked = True
-    ws.Range("B3:B6").Locked = False
+    ws.Range("B3:D6").Locked = False
 
     AddSheetButtonAtRange ws, "Buscar", "Query_Run", ws.Range("B7:C7")
     AddSheetButtonAtRange ws, "Limpar", "Query_Clear", ws.Range("D7:E7")
@@ -275,13 +336,11 @@ Private Sub Setup_CreateConsulta()
     AddSheetButtonAtRange ws, "Excluir", "Query_DeleteSelectedAllocation", ws.Range("H7:I7")
 
     Dim loQ As ListObject
-    Set loQ = EnsureTable(ws, TB_QUERY, 10, Array("AlocacaoID", "FuncionarioID", "NomeCompleto", "CPF", "RegiaoCodigo", "RegiaoNome", "DataInicio", "DataFim", "Observacoes"))
+    Set loQ = EnsureTable(ws, TB_QUERY, 12, Array("AlocacaoID", "FuncionarioID", "NomeCompleto", "CPF", "RegiaoCodigo", "RegiaoNome", "DataInicio", "DataFim", "Observacoes"))
     ws.Columns.AutoFit
 
-    ws.Range("A3:A6").Font.Bold = True
-    ws.Range("B3:B6").Interior.Color = RGB(242, 242, 242)
-    ws.Range("B3:B6").Borders.LineStyle = xlContinuous
-    ws.Range("B3:B6").Borders.Color = RGB(220, 220, 220)
+    UI_StyleLabels ws.Range("A3:A6")
+    UI_StyleInputs ws.Range("B3:D6")
 End Sub
 
 Private Sub Setup_CreateDashboard()
@@ -310,16 +369,14 @@ Private Sub Setup_CreateDashboard()
     RemoveShapesByOnAction ws, "Dashboard_RefreshAll", "Backup_CreateNow", "Backup_Import"
 
     ws.Range("A3").Value = "Indicadores"
-    ws.Range("A3").Font.Bold = True
     ws.Range("A5").Value = "Funcionarios sem alocacao"
     ws.Range("A6").Value = "Alocacoes vencendo (7 dias)"
 
     ws.Range("B5:B6").Font.Bold = True
     ws.Range("B5:B6").Font.Size = 16
-    ws.Range("B5:B6").HorizontalAlignment = xlCenter
-    ws.Range("B5:B6").Interior.Color = RGB(242, 242, 242)
-    ws.Range("B5:B6").Borders.LineStyle = xlContinuous
-    ws.Range("B5:B6").Borders.Color = RGB(220, 220, 220)
+    UI_StyleLabels ws.Range("A3")
+    UI_StyleLabels ws.Range("A5:A6")
+    UI_StyleKpi ws.Range("B5:B6")
 
     AddSheetButtonAtRange ws, "Atualizar", "Dashboard_RefreshAll", ws.Range("D3:E4")
     AddSheetButtonAtRange ws, "Fazer Backup", "Backup_CreateNow", ws.Range("H3:I4")
@@ -327,6 +384,49 @@ Private Sub Setup_CreateDashboard()
 
     Dim loD As ListObject
     Set loD = EnsureTable(ws, TB_DASH, 9, Array("RegiaoCodigo", "RegiaoNome", "CapacidadeMaxima", "AlocadosHoje", "TaxaOcupacao"))
+    ws.Columns.AutoFit
+End Sub
+
+Private Sub Setup_CreateVersoes()
+    Dim ws As Worksheet
+    Set ws = EnsureWorksheet(SH_VERSOES)
+    ws.Unprotect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
+    ws.Cells.Clear
+
+    ws.Columns("A:A").ColumnWidth = 18
+    ws.Columns("B:B").ColumnWidth = 14
+    ws.Columns("C:C").ColumnWidth = 26
+    ws.Columns("D:D").ColumnWidth = 70
+
+    ApplySheetTheme ws, "Controle de Versoes", "A1:D1"
+
+    ws.Range("A3").Value = "Versao atual"
+    ws.Range("B3").NumberFormat = "@"
+    ws.Range("A5").Value = "Historico"
+
+    UI_StyleLabels ws.Range("A3")
+    UI_StyleLabels ws.Range("A5")
+    UI_StyleInputs ws.Range("B3")
+
+    RemoveShapesByOnAction ws, "Version_AddEntry", "Version_RefreshCurrent"
+    AddSheetButtonAtRange ws, "Nova versao", "Version_AddEntry", ws.Range("C3:D3")
+
+    Dim lo As ListObject
+    Set lo = EnsureTable(ws, TB_VERSOES, 7, Array("Versao", "Data", "Usuario", "Descricao"))
+    If Not lo.DataBodyRange Is Nothing Then
+        lo.ListColumns("Data").DataBodyRange.NumberFormat = "dd/mm/yyyy"
+    End If
+
+    If lo.DataBodyRange Is Nothing Then
+        Dim lr As ListRow
+        Set lr = lo.ListRows.Add
+        lr.Range.Cells(1, 1).Value = "1.0.0"
+        lr.Range.Cells(1, 2).Value = Date
+        lr.Range.Cells(1, 3).Value = Application.UserName
+        lr.Range.Cells(1, 4).Value = "Primeira versao"
+    End If
+
+    ws.Range("B3").Value = CStr(lo.DataBodyRange.Cells(lo.DataBodyRange.Rows.Count, 1).Value)
     ws.Columns.AutoFit
 End Sub
 
@@ -414,6 +514,7 @@ Private Sub Setup_ProtectAll()
     GetWs(SH_REGIOES).Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
     GetWs(SH_CONSULTA).Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
     GetWs(SH_DASH).Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
+    GetWs(SH_VERSOES).Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
     GetWs(SH_CADASTRO).Protect Password:=pwd, UserInterfaceOnly:=True
     GetWs(SH_ALOC_FORM).Protect Password:=pwd, UserInterfaceOnly:=True
 End Sub

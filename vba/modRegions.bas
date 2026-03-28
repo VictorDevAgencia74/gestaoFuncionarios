@@ -5,7 +5,7 @@ Public Sub Region_ClearForm()
     Dim ws As Worksheet
     Set ws = GetWs(SH_REGIOES)
     ws.Unprotect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
-    ws.Range("B3:B7").ClearContents
+    ws.Range("B3:D7").ClearContents
     ws.Protect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL)), UserInterfaceOnly:=True, AllowFiltering:=True
 End Sub
 
