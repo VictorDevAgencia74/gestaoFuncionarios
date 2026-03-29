@@ -265,16 +265,21 @@ Private Sub Dashboard_UpdateIndicators(ByVal wsDash As Worksheet)
     Dim warnDays As Long
     warnDays = Dashboard_GetWarnDays()
     If Not loA.DataBodyRange Is Nothing Then
+        Dim idxIni As Long
         Dim idxFim As Long
+        idxIni = TableColIndex(loA, "DataInicio")
         idxFim = TableColIndex(loA, "DataFim")
         Dim ra As Long
         For ra = 1 To loA.DataBodyRange.Rows.Count
+            Dim di As Date
             Dim df As Date
+            di = CDate(loA.DataBodyRange.Cells(ra, idxIni).Value)
             df = CDate(loA.DataBodyRange.Cells(ra, idxFim).Value)
-            If df >= Date And df <= Date + warnDays Then vencendo = vencendo + 1
+            If di <= Date And df >= Date And df <= Date + warnDays Then vencendo = vencendo + 1
         Next ra
     End If
     wsDash.Range("B6").Value = vencendo
+    wsDash.Range("A6").Value = "Alocacoes vencendo (" & CStr(warnDays) & " dias)"
 End Sub
 
 Private Sub Dashboard_RebuildExpiryList(ByVal wsDash As Worksheet)

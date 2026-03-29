@@ -62,6 +62,7 @@ Public Sub Allocation_SaveFromForm()
     Dim autoRow As Long
     Dim autoOldFim As Date
     Dim autoNewFim As Date
+    Dim autoCandidateFound As Boolean
 
     Allocation_ValidateRetroactive dtIni, authFlag, authCode
     wsDb.Unprotect Password:=pwd
@@ -71,9 +72,14 @@ Public Sub Allocation_SaveFromForm()
     If Len(alocId) > 0 Then rowIdx = Allocation_FindRowById(lo, alocId)
 
     If rowIdx = 0 Then
-        autoClosed = Allocation_TryAutoClosePrevious(lo, funcionarioId, dtIni, dtFim, autoRow, autoOldFim, autoNewFim)
-        Allocation_ValidateNoOverlap funcionarioId, dtIni, dtFim
+        autoCandidateFound = Allocation_FindAutoCloseCandidate(lo, funcionarioId, dtIni, dtFim, autoRow, autoOldFim, autoNewFim)
+        Allocation_ValidateNoOverlapWithCandidate lo, funcionarioId, dtIni, dtFim, autoRow, autoCandidateFound, autoNewFim
         Allocation_ValidateCapacity regiaoCodigo, dtIni, dtFim
+
+        If autoCandidateFound Then
+            lo.DataBodyRange.Cells(autoRow, TableColIndex(lo, "DataFim")).Value = autoNewFim
+            autoClosed = True
+        End If
 
         Dim lr As ListRow
         Set lr = lo.ListRows.Add
@@ -152,28 +158,6 @@ Private Sub Allocation_ValidateRetroactive(ByVal dtIni As Date, ByVal authFlag A
     End If
 End Sub
 
-Private Sub Allocation_ValidateNoOverlap(ByVal funcionarioId As String, ByVal dtIni As Date, ByVal dtFim As Date)
-    Dim lo As ListObject
-    Set lo = GetWs(SH_ALOC_DB).ListObjects(TB_ALOC)
-    If lo.DataBodyRange Is Nothing Then Exit Sub
-
-    Dim r As Long
-    Dim idxEmp As Long
-    Dim idxIni As Long
-    Dim idxFim As Long
-    idxEmp = TableColIndex(lo, "FuncionarioID")
-    idxIni = TableColIndex(lo, "DataInicio")
-    idxFim = TableColIndex(lo, "DataFim")
-
-    For r = 1 To lo.DataBodyRange.Rows.Count
-        If StrComp(CStr(lo.DataBodyRange.Cells(r, idxEmp).Value), funcionarioId, vbTextCompare) = 0 Then
-            If DateRangesOverlap(dtIni, dtFim, CDate(lo.DataBodyRange.Cells(r, idxIni).Value), CDate(lo.DataBodyRange.Cells(r, idxFim).Value)) Then
-                Err.Raise vbObjectError + 330, APP_TITLE, "Sobreposicao de periodos para o mesmo funcionario."
-            End If
-        End If
-    Next r
-End Sub
-
 Private Sub Allocation_ValidateNoOverlapExcluding(ByVal lo As ListObject, ByVal funcionarioId As String, ByVal dtIni As Date, ByVal dtFim As Date, ByVal excludeAlocId As String)
     If lo.DataBodyRange Is Nothing Then Exit Sub
 
@@ -198,34 +182,41 @@ Private Sub Allocation_ValidateNoOverlapExcluding(ByVal lo As ListObject, ByVal 
     Next r
 End Sub
 
+Private Sub Allocation_ValidateNoOverlapWithCandidate(ByVal lo As ListObject, ByVal funcionarioId As String, ByVal dtIni As Date, ByVal dtFim As Date, ByVal candidateRow As Long, ByVal hasCandidate As Boolean, ByVal candidateNewFim As Date)
+    If lo.DataBodyRange Is Nothing Then Exit Sub
+
+    Dim idxEmp As Long
+    Dim idxIni As Long
+    Dim idxFim As Long
+    idxEmp = TableColIndex(lo, "FuncionarioID")
+    idxIni = TableColIndex(lo, "DataInicio")
+    idxFim = TableColIndex(lo, "DataFim")
+
+    Dim r As Long
+    For r = 1 To lo.DataBodyRange.Rows.Count
+        If StrComp(CStr(lo.DataBodyRange.Cells(r, idxEmp).Value), funcionarioId, vbTextCompare) = 0 Then
+            Dim existingIni As Date
+            Dim existingFim As Date
+            existingIni = CDate(lo.DataBodyRange.Cells(r, idxIni).Value)
+            existingFim = CDate(lo.DataBodyRange.Cells(r, idxFim).Value)
+
+            If hasCandidate And r = candidateRow Then existingFim = candidateNewFim
+
+            If existingFim >= existingIni Then
+                If DateRangesOverlap(dtIni, dtFim, existingIni, existingFim) Then
+                    Err.Raise vbObjectError + 330, APP_TITLE, "Sobreposicao de periodos para o mesmo funcionario."
+                End If
+            End If
+        End If
+    Next r
+End Sub
+
 Private Sub Allocation_ValidateCapacity(ByVal regiaoCodigo As String, ByVal dtIni As Date, ByVal dtFim As Date)
     Dim cap As Long
     cap = Region_GetCapacity(regiaoCodigo)
     If cap <= 0 Then Exit Sub
 
-    Dim lo As ListObject
-    Set lo = GetWs(SH_ALOC_DB).ListObjects(TB_ALOC)
-    Dim countOverlap As Long
-    countOverlap = 0
-
-    If Not lo.DataBodyRange Is Nothing Then
-        Dim r As Long
-        Dim idxReg As Long
-        Dim idxIni As Long
-        Dim idxFim As Long
-        idxReg = TableColIndex(lo, "RegiaoCodigo")
-        idxIni = TableColIndex(lo, "DataInicio")
-        idxFim = TableColIndex(lo, "DataFim")
-        For r = 1 To lo.DataBodyRange.Rows.Count
-            If StrComp(CStr(lo.DataBodyRange.Cells(r, idxReg).Value), regiaoCodigo, vbTextCompare) = 0 Then
-                If DateRangesOverlap(dtIni, dtFim, CDate(lo.DataBodyRange.Cells(r, idxIni).Value), CDate(lo.DataBodyRange.Cells(r, idxFim).Value)) Then
-                    countOverlap = countOverlap + 1
-                End If
-            End If
-        Next r
-    End If
-
-    If countOverlap + 1 > cap Then
+    If Allocation_MaxConcurrentForRegion(regiaoCodigo, dtIni, dtFim, vbNullString) > cap Then
         Err.Raise vbObjectError + 340, APP_TITLE, "Capacidade maxima excedida para o periodo informado."
     End If
 End Sub
@@ -234,31 +225,8 @@ Private Sub Allocation_ValidateCapacityExcluding(ByVal lo As ListObject, ByVal r
     Dim cap As Long
     cap = Region_GetCapacity(regiaoCodigo)
     If cap <= 0 Then Exit Sub
-    If lo.DataBodyRange Is Nothing Then Exit Sub
 
-    Dim idxAid As Long
-    Dim idxReg As Long
-    Dim idxIni As Long
-    Dim idxFim As Long
-    idxAid = TableColIndex(lo, "AlocacaoID")
-    idxReg = TableColIndex(lo, "RegiaoCodigo")
-    idxIni = TableColIndex(lo, "DataInicio")
-    idxFim = TableColIndex(lo, "DataFim")
-
-    Dim countOverlap As Long
-    Dim r As Long
-    countOverlap = 0
-    For r = 1 To lo.DataBodyRange.Rows.Count
-        If StrComp(CStr(lo.DataBodyRange.Cells(r, idxAid).Value), excludeAlocId, vbTextCompare) <> 0 Then
-            If StrComp(CStr(lo.DataBodyRange.Cells(r, idxReg).Value), regiaoCodigo, vbTextCompare) = 0 Then
-                If DateRangesOverlap(dtIni, dtFim, CDate(lo.DataBodyRange.Cells(r, idxIni).Value), CDate(lo.DataBodyRange.Cells(r, idxFim).Value)) Then
-                    countOverlap = countOverlap + 1
-                End If
-            End If
-        End If
-    Next r
-
-    If countOverlap + 1 > cap Then
+    If Allocation_MaxConcurrentForRegion(regiaoCodigo, dtIni, dtFim, excludeAlocId) > cap Then
         Err.Raise vbObjectError + 340, APP_TITLE, "Capacidade maxima excedida para o periodo informado."
     End If
 End Sub
@@ -330,8 +298,8 @@ Public Sub Allocation_DeleteById(ByVal alocId As String)
     Setup_RefreshAfterDataChange
 End Sub
 
-Private Function Allocation_TryAutoClosePrevious(ByVal lo As ListObject, ByVal funcionarioId As String, ByVal dtIni As Date, ByVal dtFim As Date, ByRef rowIndex As Long, ByRef oldFim As Date, ByRef newFim As Date) As Boolean
-    Allocation_TryAutoClosePrevious = False
+Private Function Allocation_FindAutoCloseCandidate(ByVal lo As ListObject, ByVal funcionarioId As String, ByVal dtIni As Date, ByVal dtFim As Date, ByRef rowIndex As Long, ByRef oldFim As Date, ByRef newFim As Date) As Boolean
+    Allocation_FindAutoCloseCandidate = False
     rowIndex = 0
 
     If lo.DataBodyRange Is Nothing Then Exit Function
@@ -376,7 +344,89 @@ Private Function Allocation_TryAutoClosePrevious(ByVal lo As ListObject, ByVal f
         Err.Raise vbObjectError + 333, APP_TITLE, "Data de realocacao invalida para encerrar a alocacao anterior."
     End If
 
-    lo.DataBodyRange.Cells(rowIndex, idxFim).Value = newFim
-    Allocation_TryAutoClosePrevious = True
+    Allocation_FindAutoCloseCandidate = True
 End Function
+
+Private Function Allocation_MaxConcurrentForRegion(ByVal regiaoCodigo As String, ByVal candidateIni As Date, ByVal candidateFim As Date, ByVal excludeAlocId As String) As Long
+    Dim lo As ListObject
+    Set lo = GetWs(SH_ALOC_DB).ListObjects(TB_ALOC)
+
+    Dim idxAid As Long
+    Dim idxReg As Long
+    Dim idxIni As Long
+    Dim idxFim As Long
+    idxAid = TableColIndex(lo, "AlocacaoID")
+    idxReg = TableColIndex(lo, "RegiaoCodigo")
+    idxIni = TableColIndex(lo, "DataInicio")
+    idxFim = TableColIndex(lo, "DataFim")
+
+    Dim dates() As Date
+    Dim countDates As Long
+    countDates = 0
+    Allocation_AddUniqueDate dates, countDates, candidateIni
+    Allocation_AddUniqueDate dates, countDates, candidateFim
+
+    If Not lo.DataBodyRange Is Nothing Then
+        Dim r As Long
+        For r = 1 To lo.DataBodyRange.Rows.Count
+            If Len(excludeAlocId) > 0 Then
+                If StrComp(CStr(lo.DataBodyRange.Cells(r, idxAid).Value), excludeAlocId, vbTextCompare) = 0 Then GoTo NextRow
+            End If
+
+            If StrComp(CStr(lo.DataBodyRange.Cells(r, idxReg).Value), regiaoCodigo, vbTextCompare) = 0 Then
+                Dim existingIni As Date
+                Dim existingFim As Date
+                existingIni = CDate(lo.DataBodyRange.Cells(r, idxIni).Value)
+                existingFim = CDate(lo.DataBodyRange.Cells(r, idxFim).Value)
+
+                If DateRangesOverlap(candidateIni, candidateFim, existingIni, existingFim) Then
+                    If existingIni >= candidateIni And existingIni <= candidateFim Then Allocation_AddUniqueDate dates, countDates, existingIni
+                    If existingFim >= candidateIni And existingFim <= candidateFim Then Allocation_AddUniqueDate dates, countDates, existingFim
+                End If
+            End If
+NextRow:
+        Next r
+    End If
+
+    Dim i As Long
+    For i = 1 To countDates
+        Dim currentCount As Long
+        currentCount = 1
+
+        If Not lo.DataBodyRange Is Nothing Then
+            Dim rr As Long
+            For rr = 1 To lo.DataBodyRange.Rows.Count
+                If Len(excludeAlocId) > 0 Then
+                    If StrComp(CStr(lo.DataBodyRange.Cells(rr, idxAid).Value), excludeAlocId, vbTextCompare) = 0 Then GoTo NextInner
+                End If
+
+                If StrComp(CStr(lo.DataBodyRange.Cells(rr, idxReg).Value), regiaoCodigo, vbTextCompare) = 0 Then
+                    If dates(i) >= CDate(lo.DataBodyRange.Cells(rr, idxIni).Value) And dates(i) <= CDate(lo.DataBodyRange.Cells(rr, idxFim).Value) Then
+                        currentCount = currentCount + 1
+                    End If
+                End If
+NextInner:
+            Next rr
+        End If
+
+        If currentCount > Allocation_MaxConcurrentForRegion Then
+            Allocation_MaxConcurrentForRegion = currentCount
+        End If
+    Next i
+End Function
+
+Private Sub Allocation_AddUniqueDate(ByRef dates() As Date, ByRef countDates As Long, ByVal value As Date)
+    Dim i As Long
+    For i = 1 To countDates
+        If dates(i) = value Then Exit Sub
+    Next i
+
+    countDates = countDates + 1
+    If countDates = 1 Then
+        ReDim dates(1 To 1)
+    Else
+        ReDim Preserve dates(1 To countDates)
+    End If
+    dates(countDates) = value
+End Sub
 

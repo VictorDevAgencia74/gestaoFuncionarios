@@ -67,6 +67,8 @@ Public Sub Backup_ImportFromFile(ByVal filePath As String)
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
 
+    Backup_Create False
+
     Dim srcWb As Workbook
     Set srcWb = Workbooks.Open(filePath, ReadOnly:=True)
 
@@ -77,14 +79,14 @@ Public Sub Backup_ImportFromFile(ByVal filePath As String)
     Backup_UnprotectAll Array(pwd, srcPwd, "alocacao", vbNullString)
     Backup_ValidateDestinationReady
 
-    Backup_CopyAllData srcWb
+    Backup_CopyAllDataSafely srcWb
     srcWb.Close SaveChanges:=False
 
     Setup_RefreshAfterDataChange
 
     Application.DisplayAlerts = True
     Application.ScreenUpdating = True
-    MsgBox "Backup importado com sucesso." & vbCrLf & Backup_ImportSummary(srcWb), vbInformation, APP_TITLE
+    MsgBox "Backup importado com sucesso." & vbCrLf & Backup_ImportSummary(), vbInformation, APP_TITLE
     Exit Sub
 ErrHandler:
     On Error Resume Next
@@ -94,83 +96,89 @@ ErrHandler:
     Err.Raise Err.Number, APP_TITLE, Err.Description
 End Sub
 
-Private Sub Backup_CopyAllData(ByVal srcWb As Workbook)
-    Dim srcLo As ListObject
-    Dim destLo As ListObject
+Private Sub Backup_CopyAllDataSafely(ByVal srcWb As Workbook)
+    Dim funcData As Variant
+    Dim regData As Variant
+    Dim alocData As Variant
+    Dim configPwd As Variant
+    Dim configRetroCode As Variant
+    Dim configRetroDays As Variant
+    Dim configWarnDays As Variant
+    Dim colA As Variant
+    Dim colD As Variant
+    Dim colG As Variant
 
-    Set srcLo = srcWb.Worksheets(SH_FUNC_DB).ListObjects(TB_FUNC)
-    Set destLo = GetWs(SH_FUNC_DB).ListObjects(TB_FUNC)
-    Backup_CopyTableData srcLo, destLo
+    funcData = Backup_ReadTableData(srcWb.Worksheets(SH_FUNC_DB).ListObjects(TB_FUNC))
+    regData = Backup_ReadTableData(srcWb.Worksheets(SH_REGIOES).ListObjects(TB_REG))
+    alocData = Backup_ReadTableData(srcWb.Worksheets(SH_ALOC_DB).ListObjects(TB_ALOC))
 
-    Set srcLo = srcWb.Worksheets(SH_REGIOES).ListObjects(TB_REG)
-    Set destLo = GetWs(SH_REGIOES).ListObjects(TB_REG)
-    Backup_CopyTableData srcLo, destLo
+    With srcWb.Worksheets(SH_CONFIG)
+        configPwd = .Range(CFG_PROTECT_PWD_CELL).Value
+        configRetroCode = .Range(CFG_RETRO_CODE_CELL).Value
+        configRetroDays = .Range(CFG_RETRO_ALLOW_DAYS_CELL).Value
+        configWarnDays = .Range(CFG_EXPIRY_WARN_DAYS_CELL).Value
+        colA = .Range(.Cells(6, 1), .Cells(100, 1)).Value
+        colD = .Range(.Cells(6, 4), .Cells(100, 4)).Value
+        colG = .Range(.Cells(6, 7), .Cells(100, 7)).Value
+    End With
 
-    Set srcLo = srcWb.Worksheets(SH_ALOC_DB).ListObjects(TB_ALOC)
-    Set destLo = GetWs(SH_ALOC_DB).ListObjects(TB_ALOC)
-    Backup_CopyTableData srcLo, destLo
-
-    Backup_CopyConfig srcWb
+    Backup_WriteTableData GetWs(SH_FUNC_DB).ListObjects(TB_FUNC), funcData
+    Backup_WriteTableData GetWs(SH_REGIOES).ListObjects(TB_REG), regData
+    Backup_WriteTableData GetWs(SH_ALOC_DB).ListObjects(TB_ALOC), alocData
+    Backup_WriteConfig configPwd, configRetroCode, configRetroDays, configWarnDays, colA, colD, colG
 End Sub
 
-Private Sub Backup_CopyTableData(ByVal srcLo As ListObject, ByVal destLo As ListObject)
-    On Error GoTo ErrHandler
-    Dim srcRows As Long
+Private Function Backup_ReadTableData(ByVal srcLo As ListObject) As Variant
     If srcLo.DataBodyRange Is Nothing Then
-        srcRows = 0
+        Backup_ReadTableData = Empty
     Else
-        srcRows = srcLo.DataBodyRange.Rows.Count
+        Backup_ReadTableData = srcLo.DataBodyRange.Value
+    End If
+End Sub
+
+Private Sub Backup_WriteTableData(ByVal destLo As ListObject, ByVal data As Variant)
+    On Error GoTo ErrHandler
+    Dim targetRows As Long
+    Dim targetCols As Long
+
+    If IsEmpty(data) Then
+        targetRows = 0
+    ElseIf IsArray(data) Then
+        targetRows = UBound(data, 1)
+        targetCols = UBound(data, 2)
+    Else
+        targetRows = 1
+        targetCols = 1
     End If
 
     If Not destLo.DataBodyRange Is Nothing Then
         destLo.DataBodyRange.Delete
     End If
 
-    If srcRows = 0 Then Exit Sub
+    If targetRows = 0 Then Exit Sub
 
     Dim i As Long
-    For i = 1 To srcRows
+    For i = 1 To targetRows
         destLo.ListRows.Add
     Next i
 
-    Dim lc As ListColumn
-    Dim srcIdx As Long
-    For Each lc In destLo.ListColumns
-        srcIdx = TableColIndex(srcLo, CStr(lc.Name))
-        If srcIdx > 0 Then
-            destLo.ListColumns(lc.Index).DataBodyRange.Value = srcLo.ListColumns(srcIdx).DataBodyRange.Value
-        End If
-    Next lc
+    destLo.DataBodyRange.Resize(targetRows, targetCols).Value = data
     Exit Sub
 ErrHandler:
     Err.Raise Err.Number, APP_TITLE, Err.Description
 End Sub
 
-Private Sub Backup_CopyConfig(ByVal srcWb As Workbook)
-    On Error GoTo ErrHandler
-    Dim srcWs As Worksheet
+Private Sub Backup_WriteConfig(ByVal protectPwd As Variant, ByVal retroCode As Variant, ByVal retroDays As Variant, ByVal warnDays As Variant, ByVal colA As Variant, ByVal colD As Variant, ByVal colG As Variant)
     Dim destWs As Worksheet
-    Set srcWs = srcWb.Worksheets(SH_CONFIG)
     Set destWs = GetWs(SH_CONFIG)
 
-    destWs.Range(CFG_PROTECT_PWD_CELL).Value = srcWs.Range(CFG_PROTECT_PWD_CELL).Value
-    destWs.Range(CFG_RETRO_CODE_CELL).Value = srcWs.Range(CFG_RETRO_CODE_CELL).Value
-    destWs.Range(CFG_RETRO_ALLOW_DAYS_CELL).Value = srcWs.Range(CFG_RETRO_ALLOW_DAYS_CELL).Value
-
-    Backup_CopyConfigColumn srcWs, destWs, 1, 6, 100
-    Backup_CopyConfigColumn srcWs, destWs, 4, 6, 100
-    Backup_CopyConfigColumn srcWs, destWs, 7, 6, 100
-    Exit Sub
-ErrHandler:
-    Err.Raise Err.Number, APP_TITLE, Err.Description
-End Sub
-
-Private Sub Backup_CopyConfigColumn(ByVal srcWs As Worksheet, ByVal destWs As Worksheet, ByVal colN As Long, ByVal firstRow As Long, ByVal maxRow As Long)
-    Dim rngSrc As Range
-    Dim rngDest As Range
-    Set rngSrc = srcWs.Range(srcWs.Cells(firstRow, colN), srcWs.Cells(maxRow, colN))
-    Set rngDest = destWs.Range(destWs.Cells(firstRow, colN), destWs.Cells(maxRow, colN))
-    rngDest.Value = rngSrc.Value
+    destWs.Range(CFG_PROTECT_PWD_CELL).Value = protectPwd
+    destWs.Range(CFG_RETRO_CODE_CELL).Value = retroCode
+    destWs.Range(CFG_RETRO_ALLOW_DAYS_CELL).Value = retroDays
+    destWs.Range(CFG_EXPIRY_WARN_DAYS_CELL).Value = warnDays
+    destWs.Range(destWs.Cells(6, 1), destWs.Cells(100, 1)).Value = colA
+    destWs.Range(destWs.Cells(6, 4), destWs.Cells(100, 4)).Value = colD
+    destWs.Range(destWs.Cells(6, 7), destWs.Cells(100, 7)).Value = colG
 End Sub
 
 Private Function Backup_FolderPath() As String
@@ -242,7 +250,7 @@ Private Function Backup_TableRowCount(ByVal lo As ListObject) As Long
     End If
 End Function
 
-Private Function Backup_ImportSummary(ByVal srcWb As Workbook) As String
+Private Function Backup_ImportSummary() As String
     On Error GoTo ErrHandler
     Dim nFunc As Long
     Dim nReg As Long

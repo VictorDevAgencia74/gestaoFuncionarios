@@ -2,6 +2,8 @@ Attribute VB_Name = "modSetup"
 Option Explicit
 
 Public Sub Setup_InitializeWorkbook()
+    On Error GoTo ErrHandler
+
     Application.ScreenUpdating = False
     Application.DisplayAlerts = False
 
@@ -22,6 +24,14 @@ Public Sub Setup_InitializeWorkbook()
     Application.DisplayAlerts = True
     Application.ScreenUpdating = True
     MsgBox "Estrutura criada/atualizada com sucesso.", vbInformation, APP_TITLE
+    Exit Sub
+
+ErrHandler:
+    On Error Resume Next
+    Setup_ProtectAll
+    Application.DisplayAlerts = True
+    Application.ScreenUpdating = True
+    MsgBox "Falha ao montar a estrutura: " & Err.Description, vbExclamation, APP_TITLE
 End Sub
 
 Private Sub Setup_UnprotectAllSafe()
@@ -95,7 +105,7 @@ Private Sub Setup_CreateConfig()
     End If
     If Len(CStr(ws.Range("A5").Value)) = 0 Then ws.Range("A5").Value = "DiasVencimentoAlocacao"
     If Not IsNumeric(ws.Range(CFG_EXPIRY_WARN_DAYS_CELL).Value) Or CLng(ws.Range(CFG_EXPIRY_WARN_DAYS_CELL).Value) < 0 Then ws.Range(CFG_EXPIRY_WARN_DAYS_CELL).Value = 7
-    ws.Visible = xlSheetVisible
+    ws.Visible = xlSheetVeryHidden
 End Sub
 
 Private Sub Setup_CreateDatabaseSheets()
@@ -162,6 +172,7 @@ Private Sub Setup_CreateCadastro()
     ws.Rows("10:10").RowHeight = 10
     ws.Rows("11:13").RowHeight = 28
 
+    UI_StyleSectionCard ws.Range("A3:D13")
     ws.Cells.Locked = True
     ws.Range("B4:D9").Locked = False
 
@@ -174,6 +185,9 @@ Private Sub Setup_CreateCadastro()
     ws.Range("A3:A9").VerticalAlignment = xlCenter
     UI_StyleLabels ws.Range("A3:A9")
     UI_StyleInputs ws.Range("B3:D9")
+    ws.Range("A2").Value = "Cadastro principal"
+    UI_StyleHelpText ws.Range("A2")
+    ws.Range("B3").Interior.Color = UI_ColorPanel()
 End Sub
 
 Private Sub Setup_CreateRegioes()
@@ -214,6 +228,7 @@ Private Sub Setup_CreateRegioes()
     ws.Rows("9:10").RowHeight = 28
     ws.Rows("11:11").RowHeight = 10
 
+    UI_StyleSectionCard ws.Range("A2:E10")
     UI_StyleLabels ws.Range("A3:A7")
     UI_StyleInputs ws.Range("B3:D7")
     ws.Range("B7").NumberFormat = "0"
@@ -279,6 +294,7 @@ Private Sub Setup_CreateAlocacao()
 
     RemoveShapesByOnAction ws, "Allocation_SaveFromForm", "Allocation_ClearForm"
 
+    UI_StyleSectionCard ws.Range("A2:D13")
     ws.Cells.Locked = True
     ws.Range("B3:D7").Locked = False
     ws.Range("B9:D10").Locked = False
@@ -290,6 +306,7 @@ Private Sub Setup_CreateAlocacao()
     UI_StyleLabels ws.Range("A3:A10")
     UI_StyleInputs ws.Range("B3:D7")
     UI_StyleInputs ws.Range("B9:D10")
+    UI_StyleHelpText ws.Range("A2:B2")
 End Sub
 
 Private Sub Setup_CreateConsulta()
@@ -327,6 +344,7 @@ Private Sub Setup_CreateConsulta()
     ws.Rows("7:7").RowHeight = 28
     ws.Rows("8:8").RowHeight = 10
 
+    UI_StyleSectionCard ws.Range("A3:I7")
     ws.Cells.Locked = True
     ws.Range("B3:D6").Locked = False
 
@@ -370,10 +388,11 @@ Private Sub Setup_CreateDashboard()
 
     ws.Range("A3").Value = "Indicadores"
     ws.Range("A5").Value = "Funcionarios sem alocacao"
-    ws.Range("A6").Value = "Alocacoes vencendo (7 dias)"
+    ws.Range("A6").Value = "Alocacoes vencendo"
 
     ws.Range("B5:B6").Font.Bold = True
     ws.Range("B5:B6").Font.Size = 16
+    UI_StyleSectionCard ws.Range("A3:E6")
     UI_StyleLabels ws.Range("A3")
     UI_StyleLabels ws.Range("A5:A6")
     UI_StyleKpi ws.Range("B5:B6")
@@ -407,6 +426,7 @@ Private Sub Setup_CreateVersoes()
     UI_StyleLabels ws.Range("A3")
     UI_StyleLabels ws.Range("A5")
     UI_StyleInputs ws.Range("B3")
+    UI_StyleSectionCard ws.Range("A3:D5")
 
     RemoveShapesByOnAction ws, "Version_AddEntry", "Version_RefreshCurrent"
     AddSheetButtonAtRange ws, "Nova versao", "Version_AddEntry", ws.Range("C3:D3")
@@ -517,5 +537,6 @@ Private Sub Setup_ProtectAll()
     GetWs(SH_VERSOES).Protect Password:=pwd, UserInterfaceOnly:=True, AllowFiltering:=True
     GetWs(SH_CADASTRO).Protect Password:=pwd, UserInterfaceOnly:=True
     GetWs(SH_ALOC_FORM).Protect Password:=pwd, UserInterfaceOnly:=True
+    GetWs(SH_CONFIG).Visible = xlSheetVeryHidden
 End Sub
 

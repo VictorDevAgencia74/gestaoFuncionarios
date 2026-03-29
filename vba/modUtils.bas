@@ -2,31 +2,43 @@ Attribute VB_Name = "modUtils"
 Option Explicit
 
 Public Function UI_FontBase() As String
-    UI_FontBase = "Segoe UI"
+    UI_FontBase = "Aptos"
 End Function
 
 Public Function UI_ColorPrimary() As Long
-    UI_ColorPrimary = RGB(37, 99, 235)
+    UI_ColorPrimary = RGB(24, 58, 95)
+End Function
+
+Public Function UI_ColorPrimaryDark() As Long
+    UI_ColorPrimaryDark = RGB(12, 34, 59)
+End Function
+
+Public Function UI_ColorAccent() As Long
+    UI_ColorAccent = RGB(15, 118, 110)
 End Function
 
 Public Function UI_ColorSurface() As Long
-    UI_ColorSurface = RGB(255, 255, 255)
+    UI_ColorSurface = RGB(248, 250, 252)
 End Function
 
 Public Function UI_ColorSurfaceAlt() As Long
-    UI_ColorSurfaceAlt = RGB(248, 250, 252)
+    UI_ColorSurfaceAlt = RGB(255, 255, 255)
+End Function
+
+Public Function UI_ColorPanel() As Long
+    UI_ColorPanel = RGB(241, 245, 249)
 End Function
 
 Public Function UI_ColorBorder() As Long
-    UI_ColorBorder = RGB(226, 232, 240)
+    UI_ColorBorder = RGB(203, 213, 225)
 End Function
 
 Public Function UI_ColorText() As Long
-    UI_ColorText = RGB(15, 23, 42)
+    UI_ColorText = RGB(30, 41, 59)
 End Function
 
 Public Function UI_ColorTextMuted() As Long
-    UI_ColorTextMuted = RGB(71, 85, 105)
+    UI_ColorTextMuted = RGB(100, 116, 139)
 End Function
 
 Public Function UI_ColorTextOnPrimary() As Long
@@ -36,26 +48,44 @@ End Function
 Public Sub UI_StyleInputs(ByVal area As Range)
     area.Font.Name = UI_FontBase()
     area.Font.Color = UI_ColorText()
+    area.Font.Size = 11
     area.Interior.Color = UI_ColorSurfaceAlt()
     area.Borders.LineStyle = xlContinuous
     area.Borders.Color = UI_ColorBorder()
+    area.Borders.Weight = xlThin
+    area.VerticalAlignment = xlCenter
 End Sub
 
 Public Sub UI_StyleLabels(ByVal area As Range)
     area.Font.Name = UI_FontBase()
     area.Font.Color = UI_ColorText()
     area.Font.Bold = True
+    area.Font.Size = 10
+End Sub
+
+Public Sub UI_StyleHelpText(ByVal area As Range)
+    area.Font.Name = UI_FontBase()
+    area.Font.Color = UI_ColorTextMuted()
+    area.Font.Size = 9
 End Sub
 
 Public Sub UI_StyleKpi(ByVal area As Range)
     area.Font.Name = UI_FontBase()
     area.Font.Color = UI_ColorText()
     area.Font.Bold = True
-    area.Interior.Color = UI_ColorSurfaceAlt()
+    area.Font.Size = 16
+    area.Interior.Color = RGB(230, 244, 241)
     area.Borders.LineStyle = xlContinuous
     area.Borders.Color = UI_ColorBorder()
     area.HorizontalAlignment = xlCenter
     area.VerticalAlignment = xlCenter
+End Sub
+
+Public Sub UI_StyleSectionCard(ByVal area As Range)
+    area.Interior.Color = UI_ColorPanel()
+    area.Borders.LineStyle = xlContinuous
+    area.Borders.Color = UI_ColorBorder()
+    area.Borders.Weight = xlThin
 End Sub
 
 Public Function GetWs(ByVal sheetName As String) As Worksheet
@@ -118,7 +148,7 @@ Public Sub ApplySheetTheme(ByVal ws As Worksheet, ByVal titleText As String, ByV
     ws.Range(titleRangeAddress).Merge
     ws.Range(titleRangeAddress).Value = titleText
     With ws.Range(titleRangeAddress)
-        .Font.Size = 18
+        .Font.Size = 17
         .Font.Bold = True
         .Font.Color = UI_ColorTextOnPrimary()
         .Interior.Color = UI_ColorPrimary()
@@ -128,6 +158,8 @@ Public Sub ApplySheetTheme(ByVal ws As Worksheet, ByVal titleText As String, ByV
     ws.Rows(ws.Range(titleRangeAddress).Row).RowHeight = 34
     ws.Range(titleRangeAddress).Borders(xlEdgeBottom).LineStyle = xlContinuous
     ws.Range(titleRangeAddress).Borders(xlEdgeBottom).Color = UI_ColorBorder()
+    ws.Range(titleRangeAddress).Borders(xlEdgeBottom).Weight = xlThin
+    ws.Range(titleRangeAddress).IndentLevel = 1
 
     Dim prev As Worksheet
     On Error Resume Next
@@ -338,8 +370,9 @@ Public Sub AddSheetButton(ByVal ws As Worksheet, ByVal caption As String, ByVal 
     shp.TextFrame.HorizontalAlignment = xlHAlignCenter
     shp.TextFrame.VerticalAlignment = xlVAlignCenter
     shp.Fill.ForeColor.RGB = UI_ColorPrimary()
-    shp.Line.ForeColor.RGB = UI_ColorPrimary()
-    shp.Shadow.Visible = False
+    shp.Line.ForeColor.RGB = UI_ColorPrimaryDark()
+    shp.Line.Weight = 1.25
+    shp.Shadow.Visible = True
     shp.Adjustments.Item(1) = 0.18
     shp.OnAction = macroName
     shp.Placement = xlMoveAndSize
