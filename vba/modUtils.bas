@@ -146,9 +146,15 @@ Public Sub RemoveShapesByOnAction(ByVal ws As Worksheet, ParamArray macroNames()
     Dim shp As Shape
     Dim i As Long
     For Each shp In ws.Shapes
-        If Len(shp.OnAction) > 0 Then
+        Dim act As String
+        act = ""
+        On Error Resume Next
+        act = CStr(shp.OnAction)
+        On Error GoTo 0
+
+        If Len(act) > 0 Then
             For i = LBound(macroNames) To UBound(macroNames)
-                If StrComp(shp.OnAction, CStr(macroNames(i)), vbTextCompare) = 0 Then
+                If StrComp(act, CStr(macroNames(i)), vbTextCompare) = 0 Then
                     shp.Delete
                     Exit For
                 End If
@@ -163,17 +169,6 @@ Public Sub RemoveShapesByOnAction(ByVal ws As Worksheet, ParamArray macroNames()
             If StrComp(CStr(btn.OnAction), CStr(macroNames(i)), vbTextCompare) = 0 Then
                 btn.Delete
                 Exit For
-            End If
-            Err.Clear
-            Dim n As String
-            n = CStr(btn.Name)
-            If Err.Number = 0 Then
-                If Left$(n, 4) = "btn_" Then
-                    If InStr(1, n, "btn_" & CStr(macroNames(i)), vbTextCompare) = 1 Then
-                        btn.Delete
-                        Exit For
-                    End If
-                End If
             End If
         Next i
     Next btn
