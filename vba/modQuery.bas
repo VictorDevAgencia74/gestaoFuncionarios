@@ -105,7 +105,7 @@ Public Sub Query_Run()
 NextR:
     Next r
 
-    ws.Columns.AutoFit
+    Query_AutoFitResults ws, loOut
     ws.Protect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL)), UserInterfaceOnly:=True, AllowFiltering:=True
     Exit Sub
 ErrHandler:
@@ -120,6 +120,21 @@ ErrHandler:
     msg = errDesc
     If Len(msg) = 0 Then msg = "Erro " & CStr(errNum)
     MsgBox msg, vbExclamation, APP_TITLE
+End Sub
+
+Private Sub Query_AutoFitResults(ByVal ws As Worksheet, ByVal lo As ListObject)
+    On Error Resume Next
+    ws.Columns("A:A").ColumnWidth = 28
+    ws.Columns("B:B").ColumnWidth = 30
+    ws.Columns("C:C").ColumnWidth = 4
+    ws.Columns("D:D").ColumnWidth = 26
+    ws.Columns("E:E").ColumnWidth = 14
+    ws.Columns("F:F").ColumnWidth = 14
+
+    If Not lo Is Nothing Then
+        lo.Range.Columns.AutoFit
+    End If
+    On Error GoTo 0
 End Sub
 
 Private Function Query_GetSelectedAllocationId() As String

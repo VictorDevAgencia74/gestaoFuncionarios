@@ -252,9 +252,9 @@ Private Sub Setup_CreateAlocacao()
     ClearSheet ws
 
     ws.Columns("A:A").ColumnWidth = 24
-    ws.Columns("B:B").ColumnWidth = 46
-    ws.Columns("C:C").ColumnWidth = 4
-    ws.Columns("D:D").ColumnWidth = 20
+    ws.Columns("B:B").ColumnWidth = 52
+    ws.Columns("C:C").ColumnWidth = 3
+    ws.Columns("D:D").ColumnWidth = 3
 
     ApplySheetTheme ws, "Alocacao por Regiao", "A1:D1"
 
@@ -277,13 +277,7 @@ Private Sub Setup_CreateAlocacao()
     ws.Rows("7:7").RowHeight = 60
     ws.Range("B7").WrapText = True
 
-    ws.Range("B3:D3").Merge
-    ws.Range("B4:D4").Merge
-    ws.Range("B5:D5").Merge
-    ws.Range("B6:D6").Merge
-    ws.Range("B7:D7").Merge
-    ws.Range("B9:D9").Merge
-    ws.Range("B10:D10").Merge
+    Allocation_EnsureSafeFormLayout ws
 
     ws.Rows("2:2").RowHeight = 10
     ws.Rows("3:6").RowHeight = 22
@@ -296,8 +290,8 @@ Private Sub Setup_CreateAlocacao()
 
     UI_StyleSectionCard ws.Range("A2:D13")
     ws.Cells.Locked = True
-    ws.Range("B3:D7").Locked = False
-    ws.Range("B9:D10").Locked = False
+    ws.Range("B3:B7").Locked = False
+    ws.Range("B9:B10").Locked = False
     ws.Range("B2").Locked = True
 
     AddSheetButtonAtRange ws, "Salvar Alocacao", "Allocation_SaveFromForm", ws.Range("B12:C13")

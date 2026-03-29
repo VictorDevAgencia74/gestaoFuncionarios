@@ -5,10 +5,16 @@ Public Sub Allocation_ClearForm()
     Dim ws As Worksheet
     Set ws = GetWs(SH_ALOC_FORM)
     ws.Unprotect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
-    ws.Range("B2").ClearContents
-    ws.Range("B3:D7").ClearContents
-    ws.Range("B9:D10").ClearContents
-    ws.Range("B9").Value = "NAO"
+    Allocation_EnsureSafeFormLayout ws
+    Allocation_ClearMergedValue ws.Range("B2")
+    Allocation_ClearMergedValue ws.Range("B3")
+    Allocation_ClearMergedValue ws.Range("B4")
+    Allocation_ClearMergedValue ws.Range("B5")
+    Allocation_ClearMergedValue ws.Range("B6")
+    Allocation_ClearMergedValue ws.Range("B7")
+    Allocation_ClearMergedValue ws.Range("B9")
+    Allocation_ClearMergedValue ws.Range("B10")
+    Allocation_SetMergedValue ws.Range("B9"), "NAO"
     ws.Protect Password:=CStr(GetConfigValue(CFG_PROTECT_PWD_CELL)), UserInterfaceOnly:=True
 End Sub
 
@@ -265,15 +271,16 @@ Public Sub Allocation_LoadToFormById(ByVal alocId As String)
     Dim pwd As String
     pwd = CStr(GetConfigValue(CFG_PROTECT_PWD_CELL))
     ws.Unprotect Password:=pwd
+    Allocation_EnsureSafeFormLayout ws
 
-    ws.Range("B2").Value = alocId
-    ws.Range("B3").Value = CStr(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "FuncionarioID")).Value)
-    ws.Range("B4").Value = CStr(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "RegiaoCodigo")).Value)
-    ws.Range("B5").Value = CDate(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "DataInicio")).Value)
-    ws.Range("B6").Value = CDate(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "DataFim")).Value)
-    ws.Range("B7").Value = CStr(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "Observacoes")).Value)
-    ws.Range("B9").Value = "NAO"
-    ws.Range("B10").ClearContents
+    Allocation_SetMergedValue ws.Range("B2"), alocId
+    Allocation_SetMergedValue ws.Range("B3"), CStr(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "FuncionarioID")).Value)
+    Allocation_SetMergedValue ws.Range("B4"), CStr(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "RegiaoCodigo")).Value)
+    Allocation_SetMergedValue ws.Range("B5"), CDate(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "DataInicio")).Value)
+    Allocation_SetMergedValue ws.Range("B6"), CDate(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "DataFim")).Value)
+    Allocation_SetMergedValue ws.Range("B7"), CStr(lo.DataBodyRange.Cells(rowIdx, TableColIndex(lo, "Observacoes")).Value)
+    Allocation_SetMergedValue ws.Range("B9"), "NAO"
+    Allocation_ClearMergedValue ws.Range("B10")
 
     ws.Protect Password:=pwd, UserInterfaceOnly:=True
 End Sub
@@ -428,5 +435,67 @@ Private Sub Allocation_AddUniqueDate(ByRef dates() As Date, ByRef countDates As 
         ReDim Preserve dates(1 To countDates)
     End If
     dates(countDates) = value
+End Sub
+
+Private Sub Allocation_SetMergedValue(ByVal target As Range, ByVal value As Variant)
+    If target.MergeCells Then
+        target.MergeArea.Cells(1, 1).Value = value
+    Else
+        target.Value = value
+    End If
+End Sub
+
+Private Sub Allocation_ClearMergedValue(ByVal target As Range)
+    If target.MergeCells Then
+        target.MergeArea.Cells(1, 1).ClearContents
+    Else
+        target.ClearContents
+    End If
+End Sub
+
+Public Sub Allocation_EnsureSafeFormLayout(Optional ByVal wsRef As Variant)
+    Dim ws As Worksheet
+    If IsMissing(wsRef) Then
+        Set ws = GetWs(SH_ALOC_FORM)
+    Else
+        Set ws = wsRef
+    End If
+
+    Allocation_UnmergeInputArea ws.Range("B3:D3")
+    Allocation_UnmergeInputArea ws.Range("B4:D4")
+    Allocation_UnmergeInputArea ws.Range("B5:D5")
+    Allocation_UnmergeInputArea ws.Range("B6:D6")
+    Allocation_UnmergeInputArea ws.Range("B7:D7")
+    Allocation_UnmergeInputArea ws.Range("B9:D9")
+    Allocation_UnmergeInputArea ws.Range("B10:D10")
+
+    ws.Columns("B:B").ColumnWidth = 52
+    ws.Columns("C:C").ColumnWidth = 3
+    ws.Columns("D:D").ColumnWidth = 3
+    ws.Range("B3:B7").Locked = False
+    ws.Range("B9:B10").Locked = False
+    ws.Range("C3:D7").Locked = True
+    ws.Range("C9:D10").Locked = True
+End Sub
+
+Private Sub Allocation_UnmergeInputArea(ByVal area As Range)
+    Dim firstValue As Variant
+    firstValue = area.Cells(1, 1).Value
+
+    On Error Resume Next
+    If area.MergeCells Then area.UnMerge
+    On Error GoTo 0
+
+    area.ClearContents
+    area.Interior.Color = UI_ColorPanel()
+    area.Borders.LineStyle = xlContinuous
+    area.Borders.Color = UI_ColorBorder()
+    area.Borders.Weight = xlThin
+
+    area.Cells(1, 1).Value = firstValue
+    area.Cells(1, 1).Interior.Color = UI_ColorSurfaceAlt()
+    area.Cells(1, 1).Font.Name = UI_FontBase()
+    area.Cells(1, 1).Font.Color = UI_ColorText()
+    area.Cells(1, 1).VerticalAlignment = xlCenter
 End Sub
 
